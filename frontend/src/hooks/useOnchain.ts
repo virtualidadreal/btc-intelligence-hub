@@ -7,7 +7,7 @@ export function useLatestOnchain() {
       supabase
         .from('onchain_metrics')
         .select('*')
-        .in('metric', ['HASH_RATE', 'HASH_RATE_MOM_30D', 'NVT_RATIO', 'TX_COUNT', 'ACTIVE_ADDRESSES'])
+        .in('metric', ['HASH_RATE', 'HASH_RATE_MOM_30D', 'NVT_RATIO', 'TX_COUNT', 'ACTIVE_ADDRESSES', 'FUNDING_RATE', 'OPEN_INTEREST'])
         .order('date', { ascending: false })
         .limit(20),
     [],

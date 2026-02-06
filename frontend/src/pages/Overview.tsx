@@ -8,6 +8,7 @@ import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
 import HelpButton from '../components/common/HelpButton'
 import { usePriceChanges } from '../hooks/usePrices'
+import { useBinancePrice } from '../hooks/useBinancePrice'
 import { useLatestCycleScore } from '../hooks/useCycleScore'
 import { useLatestSignals, useLatestIndicators, useTradingRecommendations } from '../hooks/useTechnical'
 import type { TradingRecommendation } from '../hooks/useTechnical'
@@ -17,16 +18,7 @@ import { useConclusions } from '../hooks/useConclusions'
 import { useSupabaseQuery, supabase } from '../hooks/useSupabase'
 import type { OnchainMetric } from '../lib/types'
 import { formatPrice, formatPercent, cn } from '../lib/utils'
-
-const PHASE_LABELS: Record<string, string> = {
-  capitulation: 'CAPITULACION',
-  accumulation: 'ACUMULACION',
-  early_bull: 'BULL TEMPRANO',
-  mid_bull: 'BULL MEDIO',
-  late_bull: 'BULL TARDIO',
-  distribution: 'DISTRIBUCION',
-  euphoria: 'EUFORIA',
-}
+import { useI18n } from '../lib/i18n'
 
 function directionColor(dir: string) {
   if (dir === 'LONG') return 'text-bullish'
@@ -70,13 +62,25 @@ function RecommendationCard({ rec }: { rec: TradingRecommendation }) {
 }
 
 export default function Overview() {
+  const { t, ta } = useI18n()
   const { data: prices, loading: priceLoading } = usePriceChanges()
+  const livePrice = useBinancePrice()
   const { data: cycleScore } = useLatestCycleScore()
   const { data: signals } = useLatestSignals()
   const { data: allIndicators } = useLatestIndicators()
   const { data: sentiment } = useLatestSentiment()
   const { data: alerts } = useActiveAlerts()
   const { data: conclusions } = useConclusions(undefined, 3)
+
+  const PHASE_LABELS: Record<string, string> = {
+    capitulation: t('phase.capitulation'),
+    accumulation: t('phase.accumulation'),
+    early_bull: t('phase.early_bull'),
+    mid_bull: t('phase.mid_bull'),
+    late_bull: t('phase.late_bull'),
+    distribution: t('phase.distribution'),
+    euphoria: t('phase.euphoria'),
+  }
 
   const { data: onchainRaw } = useSupabaseQuery<OnchainMetric[]>(
     () =>
@@ -110,7 +114,7 @@ export default function Overview() {
     return { current, day, week, month, date: prices[0].date }
   }, [prices])
 
-  const currentPrice = priceData?.current ?? null
+  const currentPrice = (livePrice.isLive && livePrice.price > 0) ? livePrice.price : (priceData?.current ?? null)
   const recommendations = useTradingRecommendations(signals, bbIndicators, sentiment, onchainMetrics, cycleScore, currentPrice, allIndicators)
 
   const sparkline = useMemo(() => {
@@ -121,12 +125,12 @@ export default function Overview() {
   const cs = cycleScore?.[0]
   const fg = sentiment?.find((s) => s.metric === 'FEAR_GREED')
   const fgLabel =
-    fg && fg.value <= 20 ? 'Miedo Extremo' : fg && fg.value <= 40 ? 'Miedo' : fg && fg.value <= 60 ? 'Neutral' : fg && fg.value <= 80 ? 'Codicia' : 'Codicia Extrema'
+    fg && fg.value <= 20 ? t('overview.extremeFear') : fg && fg.value <= 40 ? t('overview.fear') : fg && fg.value <= 60 ? t('overview.neutral') : fg && fg.value <= 80 ? t('overview.greed') : t('overview.extremeGreed')
 
   if (priceLoading) {
     return (
       <div className="p-6 space-y-6">
-        <PageHeader title="Overview" subtitle="BTC Intelligence Hub" />
+        <PageHeader title={t('overview.title')} subtitle={t('overview.subtitle')} />
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => <CardSkeleton key={i} />)}
         </div>
@@ -138,17 +142,10 @@ export default function Overview() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <PageHeader title="Overview" subtitle="BTC Intelligence Hub">
+      <PageHeader title={t('overview.title')} subtitle={t('overview.subtitle')}>
         <HelpButton
-          title="Overview - Vista General"
-          content={[
-            "Panel principal con el resumen del estado actual de Bitcoin.",
-            "Precio BTC: Precio actual con cambios en 24h, 7d y 30d.",
-            "Cycle Score: Indicador compuesto 0-100 que mide la fase del ciclo.",
-            "Fear & Greed: Indice de sentimiento (0=miedo extremo, 100=codicia extrema).",
-            "Trading Signal: Resumen de recomendaciones. Ver pagina completa para detalle con TP/SL.",
-            "Los datos se actualizan con: btc-intel update-data && btc-intel analyze full",
-          ]}
+          title={t('overview.helpTitle')}
+          content={ta('overview')}
         />
       </PageHeader>
 
@@ -196,10 +193,10 @@ export default function Overview() {
           </div>
         )}
         <div className={`${cs ? 'lg:col-span-4' : 'lg:col-span-5'} grid grid-cols-2 lg:grid-cols-4 gap-4`}>
-          <MetricCard title="BTC Price" value={formatPrice(priceData.current)} change={formatPercent(priceData.day)} icon={<Bitcoin className="w-4 h-4" />} />
-          <MetricCard title="Fear & Greed" value={fg ? `${fg.value}` : 'N/A'} subtitle={fg ? fgLabel : ''} icon={<Brain className="w-4 h-4" />} />
-          <MetricCard title="Alertas" value={alerts ? `${alerts.length}` : '0'} icon={<AlertTriangle className="w-4 h-4" />} />
-          <MetricCard title="Conclusiones" value={conclusions ? `${conclusions.length}` : '0'} icon={<Activity className="w-4 h-4" />} />
+          <MetricCard title={t('overview.btcPrice')} value={formatPrice(priceData.current)} change={formatPercent(priceData.day)} icon={<Bitcoin className="w-4 h-4" />} />
+          <MetricCard title={t('overview.fearGreed')} value={fg ? `${fg.value}` : 'N/A'} subtitle={fg ? fgLabel : ''} icon={<Brain className="w-4 h-4" />} />
+          <MetricCard title={t('overview.alerts')} value={alerts ? `${alerts.length}` : '0'} icon={<AlertTriangle className="w-4 h-4" />} />
+          <MetricCard title={t('overview.conclusions')} value={conclusions ? `${conclusions.length}` : '0'} icon={<Activity className="w-4 h-4" />} />
         </div>
       </div>
 
@@ -208,10 +205,10 @@ export default function Overview() {
         <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-display font-semibold flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-accent-btc" /> Trading Signal
+              <TrendingUp className="w-4 h-4 text-accent-btc" /> {t('overview.tradingSignal')}
             </h3>
             <Link to="/trading" className="flex items-center gap-1 text-xs text-accent-btc hover:text-accent-btc/80 transition-colors">
-              Ver detalle completo <ArrowRight className="w-3.5 h-3.5" />
+              {t('overview.seeDetail')} <ArrowRight className="w-3.5 h-3.5" />
             </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -237,7 +234,7 @@ export default function Overview() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {alerts && alerts.length > 0 && (
           <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-            <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><Shield className="w-4 h-4 text-bearish" /> Alertas</h3>
+            <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><Shield className="w-4 h-4 text-bearish" /> {t('overview.alerts')}</h3>
             <div className="space-y-2">
               {alerts.slice(0, 5).map((a) => (
                 <div key={a.id} className={`flex items-center gap-3 p-2 rounded-lg ${a.severity === 'critical' ? 'bg-bearish/10 border border-bearish/20' : 'bg-neutral-signal/10 border border-neutral-signal/20'}`}>
@@ -250,7 +247,7 @@ export default function Overview() {
         )}
         {conclusions && conclusions.length > 0 && (
           <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-            <h3 className="font-display font-semibold mb-3">Conclusiones</h3>
+            <h3 className="font-display font-semibold mb-3">{t('overview.conclusions')}</h3>
             <div className="space-y-3">
               {conclusions.map((c) => (
                 <div key={c.id} className="border-l-2 border-accent-btc/50 pl-3">

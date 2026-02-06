@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     supabase_key: str = ""  # service_role key
     supabase_anon_key: str = ""
     fred_api_key: str = ""
+    anthropic_api_key: str = ""
 
     # FastAPI
     api_host: str = "0.0.0.0"

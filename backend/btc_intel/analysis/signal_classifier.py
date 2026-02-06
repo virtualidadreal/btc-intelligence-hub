@@ -105,6 +105,27 @@ class SignalClassifier:
         return {"signal": "extreme_bullish", "label": "NVT MUY BAJO"}
 
     @staticmethod
+    def classify_funding_rate(rate_pct: float) -> dict:
+        """Classify funding rate (contrarian). High positive = bearish, high negative = bullish."""
+        if rate_pct > 0.1: return {"signal": "extreme_bearish", "label": "FUNDING EXTREMO POSITIVO — CONTRARIAN BEARISH"}
+        if rate_pct > 0.03: return {"signal": "bearish", "label": "FUNDING POSITIVO — MERCADO LARGO"}
+        if rate_pct > -0.03: return {"signal": "neutral", "label": "FUNDING NEUTRAL"}
+        if rate_pct > -0.05: return {"signal": "bullish", "label": "FUNDING NEGATIVO — CONTRARIAN BULLISH"}
+        return {"signal": "extreme_bullish", "label": "FUNDING EXTREMO NEGATIVO — CONTRARIAN BULLISH FUERTE"}
+
+    @staticmethod
+    def classify_open_interest_change(current: float, avg_30d: float) -> dict:
+        """Classify OI change vs 30D average."""
+        if avg_30d == 0:
+            return {"signal": "neutral", "label": "OI SIN REFERENCIA"}
+        pct = ((current - avg_30d) / avg_30d) * 100
+        if pct > 20: return {"signal": "bearish", "label": "OI MUY ALTO — RIESGO LIQUIDACIONES"}
+        if pct > 5: return {"signal": "neutral", "label": "OI ELEVADO"}
+        if pct > -5: return {"signal": "neutral", "label": "OI NORMAL"}
+        if pct > -20: return {"signal": "neutral", "label": "OI BAJO"}
+        return {"signal": "bullish", "label": "OI MUY BAJO — MERCADO ORGANICO"}
+
+    @staticmethod
     def classify_volatility(vol_30d: float, vol_avg: float) -> dict:
         ratio = vol_30d / vol_avg if vol_avg > 0 else 1
         if ratio > 1.5: return {"signal": "bearish", "label": "VOLATILIDAD MUY ALTA"}

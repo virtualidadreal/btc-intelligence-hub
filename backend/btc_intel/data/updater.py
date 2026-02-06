@@ -8,6 +8,7 @@ from btc_intel.data.btc_loader import load_btc_prices
 from btc_intel.data.macro_loader import load_macro_data
 from btc_intel.data.onchain_loader import load_onchain_data
 from btc_intel.data.sentiment_loader import load_sentiment_data
+from btc_intel.data.derivatives_loader import load_derivatives_data
 
 console = Console()
 
@@ -37,6 +38,11 @@ async def update_all() -> dict:
     results["sentiment"] = await load_sentiment_data()
     console.print()
 
+    # Derivatives (Funding Rate, Open Interest)
+    console.print("[bold]📈 Derivatives Data[/bold]")
+    results["derivatives"] = await load_derivatives_data()
+    console.print()
+
     total = sum(results.values())
     console.print(f"[bold green]═══ Total: {total} filas actualizadas ═══[/bold green]")
     return results
@@ -49,6 +55,7 @@ async def update_only(category: str) -> int:
         "macro": load_macro_data,
         "onchain": load_onchain_data,
         "sentiment": load_sentiment_data,
+        "derivatives": load_derivatives_data,
     }
 
     if category not in loaders:

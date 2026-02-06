@@ -177,6 +177,8 @@ def analyze(
     from btc_intel.analysis.cycle_score import calculate_cycle_score
     from btc_intel.analysis.alerts import check_alerts
 
+    from btc_intel.analysis.derivatives import analyze_derivatives
+
     engines = {
         "technical": analyze_technical,
         "onchain": analyze_onchain,
@@ -185,6 +187,7 @@ def analyze(
         "cycles": analyze_cycles,
         "risk": analyze_risk,
         "cycle-score": calculate_cycle_score,
+        "derivatives": analyze_derivatives,
     }
 
     if area == "full":
@@ -194,6 +197,13 @@ def analyze(
             func()
         console.print(f"\n[bold]--- ALERTAS ---[/bold]")
         check_alerts()
+
+        # Backtesting: store signal snapshot after full analysis
+        from btc_intel.analysis.backtesting import store_signal_snapshot, evaluate_past_signals
+        console.print(f"\n[bold]--- BACKTESTING ---[/bold]")
+        store_signal_snapshot()
+        evaluate_past_signals()
+
         console.print("\n[bold green]═══ Análisis completo terminado ═══[/bold green]")
     elif area in engines:
         engines[area]()
@@ -367,6 +377,14 @@ def weekly():
     generate_report(type_="weekly")
 
     console.print("\n[bold green]═══ WEEKLY ROUTINE COMPLETADA ═══[/bold green]")
+
+
+@app.command(name="ai-report")
+@handle_errors
+def ai_report():
+    """Genera informe diario con AI (Claude Sonnet)."""
+    from btc_intel.reports.ai_generator import generate_ai_report
+    generate_ai_report()
 
 
 @app.command()

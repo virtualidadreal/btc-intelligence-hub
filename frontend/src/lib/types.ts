@@ -122,6 +122,37 @@ export interface CycleScore {
   similar_historical: Record<string, unknown> | null
 }
 
+export interface SignalHistory {
+  id: number
+  date: string
+  timeframe: string
+  direction: string
+  confidence: number
+  score: number
+  price_at_signal: number
+  price_1h_later: number | null
+  outcome_1h: string | null
+  created_at: string
+}
+
+export interface PortfolioPosition {
+  id: number
+  opened_at: string
+  closed_at: string | null
+  direction: string
+  entry_price: number
+  exit_price: number | null
+  size_btc: number
+  sl: number | null
+  tp1: number | null
+  tp2: number | null
+  status: string
+  pnl_usd: number | null
+  pnl_percent: number | null
+  notes: string | null
+  created_at: string
+}
+
 export interface Report {
   id: number
   title: string

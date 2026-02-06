@@ -12,22 +12,29 @@ import {
   Brain,
   FileText,
   Shield,
+  Wallet,
+  Info,
   X,
+  Languages,
 } from 'lucide-react'
+import { useI18n } from '../../lib/i18n'
+import type { LucideIcon } from 'lucide-react'
 
-const navItems = [
-  { to: '/', label: 'Overview', icon: LayoutDashboard },
-  { to: '/trading', label: 'Trading', icon: CandlestickChart },
-  { to: '/cycles', label: 'Ciclos', icon: RefreshCcw },
-  { to: '/technical', label: 'Tecnico', icon: TrendingUp },
-  { to: '/onchain', label: 'On-Chain', icon: Link2 },
-  { to: '/macro', label: 'Macro', icon: Globe },
-  { to: '/sentiment', label: 'Sentimiento', icon: MessageCircle },
-  { to: '/cycle-score', label: 'Cycle Score', icon: Target },
-  { to: '/risk', label: 'Riesgo', icon: Shield },
-  { to: '/alerts', label: 'Alertas', icon: AlertTriangle },
-  { to: '/conclusions', label: 'Conclusiones', icon: Brain },
-  { to: '/reports', label: 'Informes', icon: FileText },
+const navItems: { to: string; labelKey: string; icon: LucideIcon }[] = [
+  { to: '/', labelKey: 'nav.overview', icon: LayoutDashboard },
+  { to: '/trading', labelKey: 'nav.trading', icon: CandlestickChart },
+  { to: '/cycles', labelKey: 'nav.cycles', icon: RefreshCcw },
+  { to: '/technical', labelKey: 'nav.technical', icon: TrendingUp },
+  { to: '/onchain', labelKey: 'nav.onchain', icon: Link2 },
+  { to: '/macro', labelKey: 'nav.macro', icon: Globe },
+  { to: '/sentiment', labelKey: 'nav.sentiment', icon: MessageCircle },
+  { to: '/cycle-score', labelKey: 'nav.cycleScore', icon: Target },
+  { to: '/risk', labelKey: 'nav.risk', icon: Shield },
+  { to: '/alerts', labelKey: 'nav.alerts', icon: AlertTriangle },
+  { to: '/conclusions', labelKey: 'nav.conclusions', icon: Brain },
+  { to: '/reports', labelKey: 'nav.reports', icon: FileText },
+  { to: '/portfolio', labelKey: 'nav.portfolio', icon: Wallet },
+  { to: '/info', labelKey: 'nav.info', icon: Info },
 ]
 
 interface SidebarProps {
@@ -36,6 +43,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
+  const { lang, setLang, t } = useI18n()
+
   return (
     <>
       {/* Mobile overlay */}
@@ -58,7 +67,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           </button>
         </div>
         <nav className="flex-1 py-2 overflow-y-auto">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {navItems.map(({ to, labelKey, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -72,12 +81,21 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
               }
             >
               <Icon size={18} />
-              {label}
+              {t(labelKey)}
             </NavLink>
           ))}
         </nav>
-        <div className="p-4 border-t border-border text-xs text-text-muted">
-          v1.0.0
+        <div className="p-3 border-t border-border">
+          <button
+            onClick={() => setLang(lang === 'es' ? 'en' : 'es')}
+            className="flex items-center gap-2 w-full px-2 py-1.5 rounded-lg text-xs font-mono text-text-secondary hover:text-text-primary hover:bg-bg-tertiary/50 transition-colors"
+          >
+            <Languages size={14} />
+            <span className={lang === 'es' ? 'font-bold text-accent-btc' : ''}>ES</span>
+            <span className="text-text-muted">/</span>
+            <span className={lang === 'en' ? 'font-bold text-accent-btc' : ''}>EN</span>
+          </button>
+          <div className="mt-1 text-[10px] text-text-muted px-2">v1.0.0</div>
         </div>
       </aside>
     </>
