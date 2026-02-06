@@ -1,0 +1,166 @@
+"""Report Generator — Genera informes en Markdown."""
+
+from datetime import date, timedelta
+
+from rich.console import Console
+
+from btc_intel.context.builder import build_context
+from btc_intel.db import get_supabase
+
+console = Console()
+
+
+def generate_report(type_: str = "daily", title: str | None = None) -> str:
+    """Genera un informe y lo guarda en Supabase."""
+    db = get_supabase()
+
+    generators = {
+        "daily": _generate_daily,
+        "weekly": _generate_weekly,
+        "cycle": _generate_cycle,
+    }
+
+    if type_ not in generators:
+        console.print(f"[red]Tipo de informe desconocido: {type_}. Opciones: {', '.join(generators.keys())}[/red]")
+        return ""
+
+    report_content = generators[type_](db)
+    report_title = title or f"Informe {type_.capitalize()} — {date.today()}"
+
+    # Save to Supabase
+    record = {
+        "date": str(date.today()),
+        "type": type_,
+        "title": report_title,
+        "content": report_content,
+    }
+
+    try:
+        db.table("reports").insert(record).execute()
+        console.print(f"[green]Informe '{report_title}' guardado en Supabase[/green]")
+    except Exception as e:
+        console.print(f"[red]Error guardando informe: {e}[/red]")
+
+    # Print the report
+    console.print(f"\n{report_content}")
+    return report_content
+
+
+def _generate_daily(db) -> str:
+    """Informe diario."""
+    context = build_context(scope="morning")
+
+    # Add conclusions
+    conclusions = (
+        db.table("conclusions")
+        .select("title,content,confidence,category")
+        .eq("status", "active")
+        .gte("date", str(date.today() - timedelta(days=1)))
+        .order("created_at", desc=True)
+        .limit(5)
+        .execute()
+    )
+
+    report = f"# Informe Diario — {date.today()}\n\n"
+    report += context
+    report += "\n---\n"
+
+    if conclusions.data:
+        report += "\n## Conclusiones del Día\n\n"
+        for c in conclusions.data:
+            report += f"### {c['title']} (confianza: {c['confidence']}/10)\n"
+            report += f"{c['content']}\n\n"
+
+    report += f"\n---\n*Generado automáticamente por BTC Intelligence Hub — {date.today()}*\n"
+    return report
+
+
+def _generate_weekly(db) -> str:
+    """Informe semanal."""
+    week_ago = str(date.today() - timedelta(days=7))
+
+    report = f"# Informe Semanal — {week_ago} a {date.today()}\n\n"
+
+    # Summary context
+    report += build_context(scope="summary")
+    report += "\n---\n"
+
+    # Price change over week
+    prices = (
+        db.table("btc_prices")
+        .select("date,close")
+        .gte("date", week_ago)
+        .order("date")
+        .limit(100)
+        .execute()
+    )
+    if prices.data and len(prices.data) >= 2:
+        start_price = float(prices.data[0]["close"])
+        end_price = float(prices.data[-1]["close"])
+        pct = (end_price - start_price) / start_price * 100
+        report += f"\n## Rendimiento Semanal\n"
+        report += f"- Inicio: ${start_price:,.2f}\n"
+        report += f"- Fin: ${end_price:,.2f}\n"
+        report += f"- Cambio: {pct:+.2f}%\n"
+
+    # Conclusions of the week
+    conclusions = (
+        db.table("conclusions")
+        .select("title,content,confidence,category,validated_outcome")
+        .gte("date", week_ago)
+        .order("created_at", desc=True)
+        .limit(10)
+        .execute()
+    )
+    if conclusions.data:
+        report += f"\n## Conclusiones de la Semana ({len(conclusions.data)})\n\n"
+        for c in conclusions.data:
+            outcome = f" [{c['validated_outcome']}]" if c.get("validated_outcome") else ""
+            report += f"- **{c['title']}** (conf: {c['confidence']}/10){outcome}\n"
+
+    # Alerts of the week
+    alerts = (
+        db.table("alerts")
+        .select("title,severity,date")
+        .gte("date", week_ago)
+        .order("date", desc=True)
+        .limit(20)
+        .execute()
+    )
+    if alerts.data:
+        report += f"\n## Alertas de la Semana ({len(alerts.data)})\n\n"
+        for a in alerts.data:
+            report += f"- [{a['severity'].upper()}] {a['title']} ({a['date'][:10]})\n"
+
+    report += f"\n---\n*Generado automáticamente por BTC Intelligence Hub — {date.today()}*\n"
+    return report
+
+
+def _generate_cycle(db) -> str:
+    """Informe de análisis de ciclo."""
+    report = f"# Análisis de Ciclo — {date.today()}\n\n"
+
+    # Deep cycle analysis
+    report += build_context(scope="deep", area="cycle")
+    report += "\n---\n"
+
+    # Add technical deep
+    report += "\n## Contexto Técnico\n\n"
+    report += build_context(scope="deep", area="technical")
+    report += "\n---\n"
+
+    # Cycle Score history
+    scores = (
+        db.table("cycle_score_history")
+        .select("date,score,phase")
+        .order("date", desc=True)
+        .limit(30)
+        .execute()
+    )
+    if scores.data:
+        report += "\n## Historial Cycle Score (últimos 30 días)\n\n"
+        for s in scores.data[:10]:
+            report += f"- {s['date']}: {s['score']}/100 — {s['phase']}\n"
+
+    report += f"\n---\n*Generado automáticamente por BTC Intelligence Hub — {date.today()}*\n"
+    return report
