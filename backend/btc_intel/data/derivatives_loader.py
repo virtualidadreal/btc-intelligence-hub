@@ -1,4 +1,4 @@
-"""Derivatives Loader — Funding Rate & Open Interest from Binance Futures (free, no auth)."""
+"""Derivatives Loader — Funding Rate & Open Interest from Bybit (free, no auth, no geo-block)."""
 
 from datetime import date
 
@@ -9,11 +9,11 @@ from btc_intel.db import get_supabase
 
 console = Console()
 
-BINANCE_FUTURES_BASE = "https://fapi.binance.com"
+BYBIT_BASE = "https://api.bybit.com"
 
 
 async def load_derivatives_data() -> int:
-    """Load funding rate and open interest from Binance Futures REST API."""
+    """Load funding rate and open interest from Bybit public API."""
     db = get_supabase()
     total = 0
 
@@ -21,23 +21,22 @@ async def load_derivatives_data() -> int:
         # --- Funding Rate ---
         try:
             resp = await client.get(
-                f"{BINANCE_FUTURES_BASE}/fapi/v1/fundingRate",
-                params={"symbol": "BTCUSDT", "limit": 10},
+                f"{BYBIT_BASE}/v5/market/funding/history",
+                params={"category": "linear", "symbol": "BTCUSDT", "limit": 1},
             )
             resp.raise_for_status()
-            funding_data = resp.json()
+            data = resp.json()
+            items = data.get("result", {}).get("list", [])
 
-            if funding_data:
-                latest = funding_data[-1]
-                funding_rate = float(latest["fundingRate"]) * 100  # Convert to percentage
-                funding_time = latest["fundingTime"]
+            if items:
+                funding_rate = float(items[0]["fundingRate"]) * 100  # to percentage
 
                 record = {
                     "date": date.today().isoformat(),
                     "metric": "FUNDING_RATE",
                     "value": funding_rate,
                     "signal": _classify_funding_rate(funding_rate),
-                    "source": "binance_futures",
+                    "source": "bybit",
                 }
                 db.table("onchain_metrics").upsert(
                     record, on_conflict="date,metric"
@@ -50,36 +49,41 @@ async def load_derivatives_data() -> int:
         # --- Open Interest ---
         try:
             resp = await client.get(
-                f"{BINANCE_FUTURES_BASE}/fapi/v1/openInterest",
-                params={"symbol": "BTCUSDT"},
+                f"{BYBIT_BASE}/v5/market/open-interest",
+                params={"category": "linear", "symbol": "BTCUSDT", "intervalTime": "1h", "limit": 1},
             )
             resp.raise_for_status()
-            oi_data = resp.json()
+            data = resp.json()
+            items = data.get("result", {}).get("list", [])
 
-            if oi_data:
-                oi_btc = float(oi_data["openInterest"])
+            if items:
+                oi_value = float(items[0]["openInterest"])  # in USD for linear
 
-                # Get current price for USD value
-                price_resp = await client.get(
-                    f"{BINANCE_FUTURES_BASE}/fapi/v1/ticker/price",
-                    params={"symbol": "BTCUSDT"},
+                # Get price for reference
+                ticker_resp = await client.get(
+                    f"{BYBIT_BASE}/v5/market/tickers",
+                    params={"category": "linear", "symbol": "BTCUSDT"},
                 )
-                price_resp.raise_for_status()
-                price = float(price_resp.json()["price"])
-                oi_usd = oi_btc * price
+                ticker_resp.raise_for_status()
+                ticker_data = ticker_resp.json()
+                ticker_list = ticker_data.get("result", {}).get("list", [])
+                price = float(ticker_list[0]["lastPrice"]) if ticker_list else 0
+
+                # Bybit linear OI is in coins, multiply by price for USD
+                oi_usd = oi_value * price if price > 0 else oi_value
 
                 record = {
                     "date": date.today().isoformat(),
                     "metric": "OPEN_INTEREST",
                     "value": oi_usd,
                     "signal": None,  # Signal computed in analysis step
-                    "source": "binance_futures",
+                    "source": "bybit",
                 }
                 db.table("onchain_metrics").upsert(
                     record, on_conflict="date,metric"
                 ).execute()
                 total += 1
-                console.print(f"  Open Interest: {oi_btc:.2f} BTC (${oi_usd:,.0f})")
+                console.print(f"  Open Interest: {oi_value:.2f} BTC (${oi_usd:,.0f})")
         except Exception as e:
             console.print(f"  [yellow]Open Interest error: {e}[/yellow]")
 
