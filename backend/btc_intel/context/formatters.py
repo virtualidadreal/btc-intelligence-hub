@@ -2,9 +2,6 @@
 
 from datetime import date, timedelta
 
-LIMIT = 100000
-
-
 def format_price_section(db) -> str:
     """Precio actual + cambios 24h/7d/30d."""
     prices = (

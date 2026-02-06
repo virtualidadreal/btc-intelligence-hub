@@ -4,6 +4,7 @@ interface ChartContainerProps {
   title: string
   children: React.ReactNode
   timeRanges?: string[]
+  activeRange?: string
   onTimeRangeChange?: (range: string) => void
 }
 
@@ -13,12 +14,14 @@ export default function ChartContainer({
   title,
   children,
   timeRanges = DEFAULT_RANGES,
+  activeRange,
   onTimeRangeChange,
 }: ChartContainerProps) {
-  const [active, setActive] = useState('1Y')
+  const [localActive, setLocalActive] = useState('1Y')
+  const active = activeRange ?? localActive
 
   const handleChange = (range: string) => {
-    setActive(range)
+    setLocalActive(range)
     onTimeRangeChange?.(range)
   }
 

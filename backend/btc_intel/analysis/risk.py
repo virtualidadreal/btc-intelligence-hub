@@ -14,11 +14,23 @@ def analyze_risk() -> dict:
     db = get_supabase()
     console.print("[cyan]Calculando métricas de riesgo...[/cyan]")
 
-    btc = db.table("btc_prices").select("date,close").order("date").limit(100000).execute()
-    if not btc.data or len(btc.data) < 30:
+    # Paginated fetch to avoid PostgREST row limit
+    all_prices = []
+    page_size = 1000
+    offset = 0
+    while True:
+        result = db.table("btc_prices").select("date,close").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        all_prices.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
+    if not all_prices or len(all_prices) < 30:
         return {}
 
-    df = pd.DataFrame(btc.data)
+    df = pd.DataFrame(all_prices)
     df["close"] = df["close"].astype(float)
     df["returns"] = df["close"].pct_change()
 
@@ -46,11 +58,21 @@ def analyze_risk() -> dict:
     var_95 = float(mean_ret - 1.645 * std_ret) * 100
     var_99 = float(mean_ret - 2.326 * std_ret) * 100
 
-    # Beta vs SPX
-    spx = db.table("macro_data").select("date,value").eq("asset", "SPX").order("date").limit(100000).execute()
+    # Beta vs SPX (paginated fetch)
+    spx_data = []
+    offset = 0
+    while True:
+        result = db.table("macro_data").select("date,value").eq("asset", "SPX").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        spx_data.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
     beta = None
-    if spx.data:
-        spx_df = pd.DataFrame(spx.data).rename(columns={"value": "spx"})
+    if spx_data:
+        spx_df = pd.DataFrame(spx_data).rename(columns={"value": "spx"})
         spx_df["spx"] = spx_df["spx"].astype(float)
         merged = df.merge(spx_df, on="date")
         merged["spx_ret"] = merged["spx"].pct_change()

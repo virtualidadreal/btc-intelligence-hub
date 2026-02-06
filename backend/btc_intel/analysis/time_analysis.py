@@ -13,11 +13,23 @@ def analyze_time() -> dict:
     db = get_supabase()
     console.print("[cyan]Analizando estacionalidad...[/cyan]")
 
-    btc = db.table("btc_prices").select("date,close").order("date").limit(100000).execute()
-    if not btc.data:
+    # Paginated fetch to avoid PostgREST row limit
+    all_prices = []
+    page_size = 1000
+    offset = 0
+    while True:
+        result = db.table("btc_prices").select("date,close").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        all_prices.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
+    if not all_prices:
         return {}
 
-    df = pd.DataFrame(btc.data)
+    df = pd.DataFrame(all_prices)
     df["close"] = df["close"].astype(float)
     df["date"] = pd.to_datetime(df["date"])
     df["returns"] = df["close"].pct_change()

@@ -27,29 +27,40 @@ def analyze_cycles() -> dict:
     days_since_halving = (today - last_halving).days
     cycle_number = HALVINGS.index(last_halving) + 1
 
-    # Cargar precios
-    btc = db.table("btc_prices").select("date,close").order("date").limit(100000).execute()
-    if not btc.data:
+    # Cargar precios (paginated to avoid PostgREST row limit)
+    all_prices = []
+    page_size = 1000
+    offset = 0
+    while True:
+        result = db.table("btc_prices").select("date,close").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        all_prices.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
+    if not all_prices:
         return {}
 
-    df = pd.DataFrame(btc.data)
+    df = pd.DataFrame(all_prices)
     df["close"] = df["close"].astype(float)
     df["date"] = pd.to_datetime(df["date"]).dt.date
 
     # Precio al halving
     halving_price = None
-    for row in btc.data:
+    for row in all_prices:
         if row["date"] == str(last_halving):
             halving_price = float(row["close"])
             break
 
     if not halving_price:
         # Buscar el precio más cercano
-        close_rows = [r for r in btc.data if r["date"] >= str(last_halving - timedelta(days=3))]
+        close_rows = [r for r in all_prices if r["date"] >= str(last_halving - timedelta(days=3))]
         if close_rows:
             halving_price = float(close_rows[0]["close"])
 
-    current_price = float(btc.data[-1]["close"])
+    current_price = float(all_prices[-1]["close"])
     roi_since_halving = ((current_price - halving_price) / halving_price * 100) if halving_price else 0
 
     # Comparativa con ciclos anteriores al mismo día
@@ -58,7 +69,7 @@ def analyze_cycles() -> dict:
         target_date = halving + timedelta(days=days_since_halving)
         h_price = None
         t_price = None
-        for row in btc.data:
+        for row in all_prices:
             d = date.fromisoformat(row["date"]) if isinstance(row["date"], str) else row["date"]
             if d == halving or (h_price is None and d >= halving):
                 h_price = float(row["close"])

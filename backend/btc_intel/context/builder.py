@@ -20,9 +20,6 @@ from btc_intel.context.formatters import (
     format_compare_section,
 )
 
-LIMIT = 100000
-
-
 def build_context(scope: str = "summary", area: str | None = None,
                   period1: str | None = None, period2: str | None = None) -> str:
     """Punto de entrada principal. Construye contexto según scope."""

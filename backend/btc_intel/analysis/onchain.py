@@ -18,10 +18,21 @@ def analyze_onchain() -> int:
 
     updated = 0
 
-    # Hash Rate momentum (30d change)
-    hr = db.table("onchain_metrics").select("date,value").eq("metric", "HASH_RATE").order("date").limit(100000).execute()
-    if hr.data and len(hr.data) > 30:
-        df = pd.DataFrame(hr.data)
+    # Hash Rate momentum (30d change) - paginated fetch
+    hr_data = []
+    page_size = 1000
+    offset = 0
+    while True:
+        result = db.table("onchain_metrics").select("date,value").eq("metric", "HASH_RATE").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        hr_data.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
+    if hr_data and len(hr_data) > 30:
+        df = pd.DataFrame(hr_data)
         df["value"] = df["value"].astype(float)
         df["pct_30d"] = df["value"].pct_change(30) * 100
 
@@ -43,11 +54,21 @@ def analyze_onchain() -> int:
                 updated += len(rows[i:i+500])
             console.print(f"  [green]HASH_RATE_MOM: {len(rows)} filas[/green]")
 
-    # NVT classification
-    nvt = db.table("onchain_metrics").select("date,value").eq("metric", "NVT_RATIO").order("date").limit(100000).execute()
-    if nvt.data:
+    # NVT classification - paginated fetch
+    nvt_data = []
+    offset = 0
+    while True:
+        result = db.table("onchain_metrics").select("date,value").eq("metric", "NVT_RATIO").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        nvt_data.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
+    if nvt_data:
         rows = []
-        for entry in nvt.data:
+        for entry in nvt_data:
             sig = classifier.classify_nvt(float(entry["value"]))
             rows.append({
                 "date": entry["date"],

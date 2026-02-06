@@ -39,6 +39,37 @@ export default function Risk() {
     }
   }, [prices])
 
+  const insights = useMemo(() => {
+    if (!riskData) return []
+    const result: { type: 'bullish' | 'bearish' | 'neutral'; text: string }[] = []
+    const dd = riskData.currentDD
+    const vol = riskData.vol30
+    const sharpe = riskData.sharpe
+    const var95 = riskData.var95
+
+    // Drawdown
+    if (dd > -5) result.push({ type: 'bullish', text: `Drawdown minimo (${dd.toFixed(2)}%): BTC cerca de maximos, tendencia fuerte` })
+    else if (dd >= -15) result.push({ type: 'neutral', text: `Drawdown moderado (${dd.toFixed(2)}%): correccion saludable dentro de tendencia` })
+    else if (dd >= -30) result.push({ type: 'bearish', text: `Drawdown significativo (${dd.toFixed(2)}%): correccion profunda, posible cambio de tendencia` })
+    else result.push({ type: 'bearish', text: `Drawdown severo (${dd.toFixed(2)}%): mercado en fase bajista, extrema precaucion` })
+
+    // Volatility
+    if (vol < 40) result.push({ type: 'bullish', text: `Volatilidad baja (${vol.toFixed(1)}%): mercado estable, posible acumulacion` })
+    else if (vol <= 70) result.push({ type: 'neutral', text: `Volatilidad media (${vol.toFixed(1)}%): niveles normales para BTC` })
+    else result.push({ type: 'bearish', text: `Volatilidad alta (${vol.toFixed(1)}%): mercado inestable, mayor riesgo en operaciones` })
+
+    // Sharpe
+    if (sharpe > 2) result.push({ type: 'bullish', text: `Sharpe ratio excelente (${sharpe.toFixed(2)}): retornos excepcionales ajustados por riesgo` })
+    else if (sharpe >= 1) result.push({ type: 'bullish', text: `Sharpe ratio bueno (${sharpe.toFixed(2)}): retornos positivos con riesgo aceptable` })
+    else if (sharpe >= 0) result.push({ type: 'neutral', text: `Sharpe ratio bajo (${sharpe.toFixed(2)}): retornos positivos pero con alto riesgo` })
+    else result.push({ type: 'bearish', text: `Sharpe ratio negativo (${sharpe.toFixed(2)}): perdidas netas, entorno desfavorable` })
+
+    // VaR
+    result.push({ type: 'neutral', text: `VaR 95%: en un dia malo (5% de probabilidad), la perdida podria ser de ${var95.toFixed(2)}% o mas` })
+
+    return result
+  }, [riskData])
+
   if (loading) return <div className="p-6"><PageHeader title="Risk" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
   if (!riskData) return <div className="p-6"><PageHeader title="Risk" /><EmptyState command="btc-intel analyze risk" /></div>
 
@@ -85,6 +116,19 @@ export default function Risk() {
           </ResponsiveContainer>
         </div>
       </ChartContainer>
+
+      {/* Interpretacion */}
+      <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
+        <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+        <div className="space-y-2">
+          {insights.map((insight, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${insight.type === 'bullish' ? 'bg-bullish' : insight.type === 'bearish' ? 'bg-bearish' : 'bg-neutral-signal'}`} />
+              <p className="text-sm text-text-secondary">{insight.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

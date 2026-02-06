@@ -27,12 +27,27 @@ def generate_report(type_: str = "daily", title: str | None = None) -> str:
     report_content = generators[type_](db)
     report_title = title or f"Informe {type_.capitalize()} — {date.today()}"
 
-    # Save to Supabase
+    # Calculate period
+    today = date.today()
+    if type_ == "weekly":
+        period_start = str(today - timedelta(days=7))
+    else:
+        period_start = str(today)
+    period_end = str(today)
+
+    # Get current cycle score for the record
+    cs = db.table("cycle_score_history").select("score").order("date", desc=True).limit(1).execute()
+    current_cycle_score = cs.data[0]["score"] if cs.data else None
+
+    # Save to Supabase (matches actual table schema)
     record = {
-        "date": str(date.today()),
-        "type": type_,
+        "report_type": type_,
         "title": report_title,
         "content": report_content,
+        "period_start": period_start,
+        "period_end": period_end,
+        "cycle_score": current_cycle_score,
+        "generated_by": "system",
     }
 
     try:

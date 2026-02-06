@@ -26,6 +26,46 @@ export default function Macro() {
     }))
   }, [corrMap])
 
+  const insights = useMemo(() => {
+    const items: { type: 'bullish' | 'bearish' | 'neutral'; text: string }[] = []
+    const spx = corrByAsset.find((c) => c.asset === 'SPX')
+    const dxy = corrByAsset.find((c) => c.asset === 'DXY')
+    const gold = corrByAsset.find((c) => c.asset === 'GOLD')
+
+    if (spx?.corr30 != null) {
+      if (spx.corr30 > 0.5) {
+        items.push({ type: 'neutral', text: `Alta correlacion con S&P500 (${spx.corr30.toFixed(2)}): BTC se comporta como activo de riesgo` })
+      } else if (spx.corr30 < 0.2) {
+        items.push({ type: 'bullish', text: 'Baja correlacion con S&P500: BTC actua independiente del mercado tradicional' })
+      }
+    }
+    if (dxy?.corr30 != null) {
+      if (dxy.corr30 < -0.3) {
+        items.push({ type: 'neutral', text: `Correlacion negativa con dolar (${dxy.corr30.toFixed(2)}): la debilidad del dolar favorece a BTC` })
+      } else if (dxy.corr30 > 0.2) {
+        items.push({ type: 'bearish', text: 'Correlacion positiva inusual con dolar: movimiento atipico' })
+      }
+    }
+    if (gold?.corr30 != null) {
+      if (gold.corr30 > 0.5) {
+        items.push({ type: 'bullish', text: 'Alta correlacion con oro: BTC actua como reserva de valor' })
+      }
+    }
+
+    const bullish = items.filter((i) => i.type === 'bullish').length
+    const bearish = items.filter((i) => i.type === 'bearish').length
+    if (items.length === 0) {
+      items.push({ type: 'neutral', text: 'No hay suficientes datos macro para generar una interpretacion' })
+    } else if (bullish > bearish) {
+      items.push({ type: 'bullish', text: 'Entorno macro favorable: BTC muestra independencia y/o actua como reserva de valor' })
+    } else if (bearish > bullish) {
+      items.push({ type: 'bearish', text: 'Entorno macro desfavorable: correlaciones atipicas sugieren cautela' })
+    } else {
+      items.push({ type: 'neutral', text: 'Entorno macro mixto: las correlaciones no muestran una tendencia dominante clara' })
+    }
+    return items
+  }, [corrByAsset, corrMap])
+
   if (loading) return <div className="p-6"><PageHeader title="Macro" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
   if (!correlations?.length) return <div className="p-6"><PageHeader title="Macro" /><EmptyState command="btc-intel analyze macro" /></div>
 
@@ -79,6 +119,19 @@ export default function Macro() {
                 )
               })}
             </>
+          ))}
+        </div>
+      </div>
+
+      {/* Interpretacion */}
+      <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
+        <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+        <div className="space-y-2">
+          {insights.map((insight, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${insight.type === 'bullish' ? 'bg-bullish' : insight.type === 'bearish' ? 'bg-bearish' : 'bg-neutral-signal'}`} />
+              <p className="text-sm text-text-secondary">{insight.text}</p>
+            </div>
           ))}
         </div>
       </div>

@@ -53,6 +53,45 @@ export default function CycleScore() {
     return [...history].reverse().map((h) => ({ date: h.date.slice(5), score: h.score, phase: h.phase }))
   }, [history])
 
+  const insights = useMemo(() => {
+    if (!cs) return []
+    const result: { type: 'bullish' | 'bearish' | 'neutral'; text: string }[] = []
+    const score = cs.score
+
+    // Score level
+    if (score <= 14) result.push({ type: 'bullish', text: `Score en zona de capitulacion (${score}): historicamente la mejor zona de acumulacion a largo plazo` })
+    else if (score <= 29) result.push({ type: 'bullish', text: `Zona de acumulacion (${score}): riesgo bajo, buen momento para posiciones a largo plazo` })
+    else if (score <= 44) result.push({ type: 'neutral', text: `Bull temprano (${score}): el ciclo alcista esta comenzando, tendencia favorable` })
+    else if (score <= 59) result.push({ type: 'neutral', text: `Bull medio (${score}): ciclo madurando, mantener posiciones pero vigilar cambios` })
+    else if (score <= 74) result.push({ type: 'bearish', text: `Bull tardio (${score}): riesgo creciente, considerar reducir exposicion gradualmente` })
+    else if (score <= 84) result.push({ type: 'bearish', text: `Zona de distribucion (${score}): alto riesgo, smart money probablemente vendiendo` })
+    else result.push({ type: 'bearish', text: `Zona de euforia (${score}): riesgo extremo, el mercado esta sobrecalentado` })
+
+    // Components analysis
+    if (components.length > 0) {
+      const highest = components.reduce((a, b) => ((a.value || 0) > (b.value || 0) ? a : b))
+      const lowest = components.reduce((a, b) => ((a.value || 0) < (b.value || 0) ? a : b))
+      result.push({ type: 'bearish', text: `Componente mas bajista: ${highest.name} (${highest.value}/100)` })
+      result.push({ type: 'bullish', text: `Componente mas alcista: ${lowest.name} (${lowest.value}/100)` })
+    }
+
+    // History trend
+    if (history && history.length >= 30) {
+      const reversed = [...history].reverse()
+      const current = reversed[reversed.length - 1]
+      const thirtyDaysAgo = reversed[reversed.length - 31] || reversed[0]
+      if (current && thirtyDaysAgo) {
+        if (current.score > thirtyDaysAgo.score) {
+          result.push({ type: 'bearish', text: `Tendencia: score subiendo (hace 30d: ${thirtyDaysAgo.score}, ahora: ${current.score})` })
+        } else if (current.score < thirtyDaysAgo.score) {
+          result.push({ type: 'bullish', text: `Tendencia: score bajando (hace 30d: ${thirtyDaysAgo.score}, ahora: ${current.score})` })
+        }
+      }
+    }
+
+    return result
+  }, [cs, components, history])
+
   if (loading) return <div className="p-6"><PageHeader title="Cycle Score" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
   if (!cs) return <div className="p-6"><PageHeader title="Cycle Score" /><EmptyState command="btc-intel analyze cycle-score" /></div>
 
@@ -132,6 +171,19 @@ export default function CycleScore() {
           </ResponsiveContainer>
         </div>
       </ChartContainer>
+
+      {/* Interpretacion */}
+      <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
+        <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+        <div className="space-y-2">
+          {insights.map((insight, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${insight.type === 'bullish' ? 'bg-bullish' : insight.type === 'bearish' ? 'bg-bearish' : 'bg-neutral-signal'}`} />
+              <p className="text-sm text-text-secondary">{insight.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

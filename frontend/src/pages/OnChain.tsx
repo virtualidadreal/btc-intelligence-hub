@@ -19,6 +19,36 @@ export default function OnChain() {
   const nvt = latest?.find((m) => m.metric === 'NVT_RATIO')
   const hashRate = latest?.find((m) => m.metric === 'HASH_RATE')
 
+  const insights = useMemo(() => {
+    const items: { type: 'bullish' | 'bearish' | 'neutral'; text: string }[] = []
+    if (hrMom) {
+      if (hrMom.value > 0) {
+        items.push({ type: 'bullish', text: 'Hash Rate creciendo: la red se fortalece, mineros optimistas' })
+      } else {
+        items.push({ type: 'bearish', text: 'Hash Rate descendiendo: posible estres en mineros' })
+      }
+    }
+    if (nvt) {
+      if (nvt.value > 65) {
+        items.push({ type: 'bearish', text: 'NVT alto (>65): red posiblemente sobrevalorada respecto a su uso real' })
+      } else if (nvt.value < 30) {
+        items.push({ type: 'bullish', text: 'NVT bajo (<30): red infravalorada, buena relacion valor/uso' })
+      } else {
+        items.push({ type: 'neutral', text: 'NVT en rango normal' })
+      }
+    }
+    const bullish = items.filter((i) => i.type === 'bullish').length
+    const bearish = items.filter((i) => i.type === 'bearish').length
+    if (bullish > bearish) {
+      items.push({ type: 'bullish', text: 'En conjunto, las metricas on-chain muestran una red saludable y en crecimiento' })
+    } else if (bearish > bullish) {
+      items.push({ type: 'bearish', text: 'En conjunto, las metricas on-chain muestran senales de debilidad en la red' })
+    } else {
+      items.push({ type: 'neutral', text: 'Las metricas on-chain muestran senales mixtas, sin tendencia clara' })
+    }
+    return items
+  }, [hrMom, nvt])
+
   if (loading) return <div className="p-6"><PageHeader title="On-Chain" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
   if (!latest?.length) return <div className="p-6"><PageHeader title="On-Chain" /><EmptyState command="btc-intel analyze onchain" /></div>
 
@@ -69,6 +99,19 @@ export default function OnChain() {
           </ResponsiveContainer>
         </div>
       </ChartContainer>
+
+      {/* Interpretacion */}
+      <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
+        <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+        <div className="space-y-2">
+          {insights.map((insight, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${insight.type === 'bullish' ? 'bg-bullish' : insight.type === 'bearish' ? 'bg-bearish' : 'bg-neutral-signal'}`} />
+              <p className="text-sm text-text-secondary">{insight.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

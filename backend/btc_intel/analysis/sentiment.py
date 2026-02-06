@@ -17,10 +17,21 @@ def analyze_sentiment() -> int:
 
     total = 0
 
-    # Fear & Greed 30d moving average
-    fg = db.table("sentiment_data").select("date,value").eq("metric", "FEAR_GREED").order("date").execute()
-    if fg.data and len(fg.data) > 30:
-        df = pd.DataFrame(fg.data)
+    # Fear & Greed 30d moving average (paginated to avoid PostgREST row limit)
+    fg_data = []
+    page_size = 1000
+    offset = 0
+    while True:
+        result = db.table("sentiment_data").select("date,value").eq("metric", "FEAR_GREED").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        fg_data.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
+    if fg_data and len(fg_data) > 30:
+        df = pd.DataFrame(fg_data)
         df["value"] = df["value"].astype(float)
         df["ma30"] = df["value"].rolling(30).mean()
 

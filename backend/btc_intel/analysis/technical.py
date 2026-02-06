@@ -18,13 +18,25 @@ def analyze_technical() -> int:
     db = get_supabase()
     console.print("[cyan]Calculando indicadores técnicos...[/cyan]")
 
-    # Cargar precios
-    result = db.table("btc_prices").select("date,open,high,low,close,volume").order("date").limit(100000).execute()
-    if not result.data:
+    # Cargar precios (paginated to avoid PostgREST row limit)
+    all_prices = []
+    page_size = 1000
+    offset = 0
+    while True:
+        result = db.table("btc_prices").select("date,open,high,low,close,volume").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        all_prices.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
+    if not all_prices:
         console.print("[yellow]Sin datos de precios[/yellow]")
         return 0
 
-    df = pd.DataFrame(result.data)
+    console.print(f"[cyan]Cargados {len(all_prices)} precios[/cyan]")
+    df = pd.DataFrame(all_prices)
     df["close"] = df["close"].astype(float)
     df["high"] = df["high"].astype(float)
     df["low"] = df["low"].astype(float)

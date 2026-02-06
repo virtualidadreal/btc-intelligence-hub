@@ -19,6 +19,30 @@ export default function Sentiment() {
 
   const fgChart = useMemo(() => fgHistory ? [...fgHistory].reverse().map((d) => ({ date: d.date.slice(5), value: d.value })) : [], [fgHistory])
 
+  const insights = useMemo(() => {
+    const items: { type: 'bullish' | 'bearish' | 'neutral'; text: string }[] = []
+    if (fg) {
+      if (fg.value <= 20) {
+        items.push({ type: 'bullish', text: 'Miedo Extremo: historicamente, las mejores oportunidades de compra ocurren en estos niveles' })
+      } else if (fg.value <= 40) {
+        items.push({ type: 'bullish', text: 'Zona de Miedo: el mercado esta temeroso, posible oportunidad contrarian' })
+      } else if (fg.value >= 80) {
+        items.push({ type: 'bearish', text: 'Codicia Extrema: precaucion, el mercado esta euforico. Historicamente precede correcciones' })
+      } else if (fg.value >= 60) {
+        items.push({ type: 'bearish', text: 'Zona de Codicia: el optimismo es alto, considerar tomar beneficios parciales' })
+      } else {
+        items.push({ type: 'neutral', text: 'Sentimiento neutral: el mercado no muestra sesgo extremo' })
+      }
+    }
+    if (fg && fg30) {
+      const diff = Math.abs(fg.value - fg30.value)
+      if (diff > 15) {
+        items.push({ type: 'neutral', text: `Divergencia significativa (${diff.toFixed(1)}) entre sentimiento actual y media de 30 dias: posible cambio de tendencia` })
+      }
+    }
+    return items
+  }, [fg, fg30])
+
   if (loading) return <div className="p-6"><PageHeader title="Sentiment" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
   if (!fg) return <div className="p-6"><PageHeader title="Sentiment" /><EmptyState command="btc-intel analyze sentiment" /></div>
 
@@ -81,6 +105,19 @@ export default function Sentiment() {
           </ResponsiveContainer>
         </div>
       </ChartContainer>
+
+      {/* Interpretacion */}
+      <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
+        <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+        <div className="space-y-2">
+          {insights.map((insight, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${insight.type === 'bullish' ? 'bg-bullish' : insight.type === 'bearish' ? 'bg-bearish' : 'bg-neutral-signal'}`} />
+              <p className="text-sm text-text-secondary">{insight.text}</p>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }

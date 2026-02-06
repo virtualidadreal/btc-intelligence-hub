@@ -96,12 +96,24 @@ def calculate_cycle_score() -> dict | None:
         components["hash_rate_mom"] = min(100, max(0, int(50 + hr_val * 2)))
 
     # 7. Price position in cycle (substitute for MVRV Z-score) (weight: 0.20)
-    btc = db.table("btc_prices").select("date,close").order("date").limit(100000).execute()
-    if btc.data:
-        prices = [float(r["close"]) for r in btc.data]
+    # Paginated fetch to avoid PostgREST row limit
+    all_prices = []
+    page_size = 1000
+    offset = 0
+    while True:
+        result = db.table("btc_prices").select("date,close").order("date").range(offset, offset + page_size - 1).execute()
+        if not result.data:
+            break
+        all_prices.extend(result.data)
+        if len(result.data) < page_size:
+            break
+        offset += page_size
+
+    if all_prices:
+        prices = [float(r["close"]) for r in all_prices]
         current = prices[-1]
         ath = max(prices)
-        cycle_prices = [float(r["close"]) for r in btc.data
+        cycle_prices = [float(r["close"]) for r in all_prices
                         if r["date"] >= str(last_halving - pd.Timedelta(days=180))]
         cycle_low = min(cycle_prices) if cycle_prices else min(prices)
         # Position: 0=at cycle low, 100=at ATH
