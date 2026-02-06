@@ -20,6 +20,14 @@ export function formatDate(date: string): string {
   })
 }
 
+export function formatDateShort(date: string): string {
+  const d = new Date(date)
+  const dd = String(d.getUTCDate()).padStart(2, '0')
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0')
+  const yyyy = d.getUTCFullYear()
+  return `${dd}-${mm}-${yyyy}`
+}
+
 export function cn(...classes: (string | false | undefined | null)[]): string {
   return classes.filter(Boolean).join(' ')
 }

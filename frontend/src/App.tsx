@@ -4,6 +4,7 @@ import Layout from './components/layout/Layout'
 import ErrorBoundary from './components/common/ErrorBoundary'
 
 const Overview = lazy(() => import('./pages/Overview'))
+const Trading = lazy(() => import('./pages/Trading'))
 const Cycles = lazy(() => import('./pages/Cycles'))
 const Technical = lazy(() => import('./pages/Technical'))
 const OnChain = lazy(() => import('./pages/OnChain'))
@@ -22,6 +23,7 @@ export default function App() {
         <Routes>
           <Route element={<Layout />}>
             <Route path="/" element={<Overview />} />
+            <Route path="/trading" element={<Trading />} />
             <Route path="/cycles" element={<Cycles />} />
             <Route path="/technical" element={<Technical />} />
             <Route path="/onchain" element={<OnChain />} />

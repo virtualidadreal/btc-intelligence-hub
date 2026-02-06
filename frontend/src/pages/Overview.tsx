@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Activity, TrendingUp, Shield, AlertTriangle, Brain, Bitcoin } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Activity, TrendingUp, Shield, AlertTriangle, Brain, Bitcoin, ArrowUp, ArrowDown, Minus, ArrowRight } from 'lucide-react'
 import { LineChart, Line, ResponsiveContainer } from 'recharts'
 import MetricCard, { SignalBadge } from '../components/common/MetricCard'
 import { CardSkeleton } from '../components/common/LoadingSkeleton'
@@ -8,11 +9,14 @@ import PageHeader from '../components/common/PageHeader'
 import HelpButton from '../components/common/HelpButton'
 import { usePriceChanges } from '../hooks/usePrices'
 import { useLatestCycleScore } from '../hooks/useCycleScore'
-import { useLatestSignals } from '../hooks/useTechnical'
+import { useLatestSignals, useLatestIndicators, useTradingRecommendations } from '../hooks/useTechnical'
+import type { TradingRecommendation } from '../hooks/useTechnical'
 import { useLatestSentiment } from '../hooks/useSentiment'
 import { useActiveAlerts } from '../hooks/useAlerts'
 import { useConclusions } from '../hooks/useConclusions'
-import { formatPrice, formatPercent } from '../lib/utils'
+import { useSupabaseQuery, supabase } from '../hooks/useSupabase'
+import type { OnchainMetric } from '../lib/types'
+import { formatPrice, formatPercent, cn } from '../lib/utils'
 
 const PHASE_LABELS: Record<string, string> = {
   capitulation: 'CAPITULACION',
@@ -24,13 +28,78 @@ const PHASE_LABELS: Record<string, string> = {
   euphoria: 'EUFORIA',
 }
 
+function directionColor(dir: string) {
+  if (dir === 'LONG') return 'text-bullish'
+  if (dir === 'SHORT') return 'text-bearish'
+  return 'text-neutral-signal'
+}
+
+function directionBg(dir: string) {
+  if (dir === 'LONG') return 'bg-bullish/10 border-bullish/20'
+  if (dir === 'SHORT') return 'bg-bearish/10 border-bearish/20'
+  return 'bg-neutral-signal/10 border-neutral-signal/20'
+}
+
+function DirectionIcon({ direction }: { direction: string }) {
+  if (direction === 'LONG') return <ArrowUp className="w-5 h-5" />
+  if (direction === 'SHORT') return <ArrowDown className="w-5 h-5" />
+  return <Minus className="w-5 h-5" />
+}
+
+function RecommendationCard({ rec }: { rec: TradingRecommendation }) {
+  return (
+    <div className={cn('rounded-lg border p-3', directionBg(rec.direction))}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-mono text-text-muted">{rec.timeframe}</span>
+      </div>
+      <div className={cn('flex items-center justify-center gap-1.5 font-bold text-lg', directionColor(rec.direction))}>
+        <DirectionIcon direction={rec.direction} />
+        <span>{rec.direction}</span>
+      </div>
+      <div className="text-center mt-1">
+        <span className={cn('text-sm font-mono font-bold', directionColor(rec.direction))}>{rec.confidence}%</span>
+      </div>
+      {rec.levels && (
+        <div className="mt-2 pt-2 border-t border-border/50 space-y-0.5 text-[10px] font-mono">
+          <div className="flex justify-between"><span className="text-bullish">TP1</span><span>{formatPrice(rec.levels.tp1)}</span></div>
+          <div className="flex justify-between"><span className="text-bearish">SL</span><span>{formatPrice(rec.levels.sl)}</span></div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function Overview() {
   const { data: prices, loading: priceLoading } = usePriceChanges()
   const { data: cycleScore } = useLatestCycleScore()
   const { data: signals } = useLatestSignals()
+  const { data: allIndicators } = useLatestIndicators()
   const { data: sentiment } = useLatestSentiment()
   const { data: alerts } = useActiveAlerts()
   const { data: conclusions } = useConclusions(undefined, 3)
+
+  const { data: onchainRaw } = useSupabaseQuery<OnchainMetric[]>(
+    () =>
+      supabase
+        .from('onchain_metrics')
+        .select('*')
+        .in('metric', ['HASH_RATE_MOM', 'NVT_RATIO'])
+        .order('date', { ascending: false })
+        .limit(4),
+    [],
+    'onchain-trading-signals',
+  )
+
+  const onchainMetrics = useMemo(() => {
+    const hashRate = onchainRaw?.find((m) => m.metric === 'HASH_RATE_MOM') ?? null
+    const nvt = onchainRaw?.find((m) => m.metric === 'NVT_RATIO') ?? null
+    return { hashRate, nvt }
+  }, [onchainRaw])
+
+  const bbIndicators = useMemo(() => {
+    if (!allIndicators) return null
+    return allIndicators.filter((i) => i.indicator.startsWith('BB_'))
+  }, [allIndicators])
 
   const priceData = useMemo(() => {
     if (!prices || prices.length < 2) return null
@@ -40,6 +109,9 @@ export default function Overview() {
     const month = prices.length > 30 ? ((current - prices[30].close) / prices[30].close) * 100 : 0
     return { current, day, week, month, date: prices[0].date }
   }, [prices])
+
+  const currentPrice = priceData?.current ?? null
+  const recommendations = useTradingRecommendations(signals, bbIndicators, sentiment, onchainMetrics, cycleScore, currentPrice, allIndicators)
 
   const sparkline = useMemo(() => {
     if (!prices) return []
@@ -71,10 +143,10 @@ export default function Overview() {
           title="Overview - Vista General"
           content={[
             "Panel principal con el resumen del estado actual de Bitcoin.",
-            "Precio BTC: Precio actual con cambios en 24h, 7d y 30d. La mini-grafica muestra la tendencia de los ultimos 7 dias.",
-            "Cycle Score: Indicador compuesto 0-100 que mide en que fase del ciclo de mercado estamos. Mas bajo = mejor momento de compra, mas alto = mas riesgo.",
-            "Fear & Greed: Indice de sentimiento del mercado (0=miedo extremo, 100=codicia extrema). Valores bajos suelen ser buenas oportunidades.",
-            "Signals: Senales tecnicas de RSI, MACD y cruce de medias moviles. Verde=alcista, Rojo=bajista.",
+            "Precio BTC: Precio actual con cambios en 24h, 7d y 30d.",
+            "Cycle Score: Indicador compuesto 0-100 que mide la fase del ciclo.",
+            "Fear & Greed: Indice de sentimiento (0=miedo extremo, 100=codicia extrema).",
+            "Trading Signal: Resumen de recomendaciones. Ver pagina completa para detalle con TP/SL.",
             "Los datos se actualizan con: btc-intel update-data && btc-intel analyze full",
           ]}
         />
@@ -131,18 +203,33 @@ export default function Overview() {
         </div>
       </div>
 
-      {/* Signals */}
-      {signals && signals.length > 0 && (
+      {/* Trading Signal Summary */}
+      {recommendations.length > 0 && (
         <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-          <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-accent-btc" /> Signals</h3>
-          <div className="flex flex-wrap gap-2">
-            {signals.map((s, i) => (
-              <div key={`${s.indicator}-${i}`} className="flex items-center gap-2 bg-bg-tertiary/50 rounded-lg px-3 py-1.5">
-                <span className="text-xs font-mono text-text-secondary">{s.indicator}</span>
-                {s.signal && <SignalBadge signal={s.signal} />}
-              </div>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-display font-semibold flex items-center gap-2">
+              <TrendingUp className="w-4 h-4 text-accent-btc" /> Trading Signal
+            </h3>
+            <Link to="/trading" className="flex items-center gap-1 text-xs text-accent-btc hover:text-accent-btc/80 transition-colors">
+              Ver detalle completo <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {recommendations.map((rec) => (
+              <RecommendationCard key={rec.timeframe} rec={rec} />
             ))}
           </div>
+          {signals && signals.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {signals.map((s) => (
+                <div key={s.indicator} className="flex items-center gap-2 bg-bg-tertiary/50 rounded-lg px-3 py-1.5">
+                  <span className="text-xs font-mono text-text-secondary">{s.indicator}</span>
+                  <span className="text-xs font-mono text-text-muted">{s.value != null ? s.value.toFixed(1) : ''}</span>
+                  {s.signal && <SignalBadge signal={s.signal} />}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

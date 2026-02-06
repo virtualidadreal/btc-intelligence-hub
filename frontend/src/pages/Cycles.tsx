@@ -4,7 +4,7 @@ import HelpButton from '../components/common/HelpButton'
 import EmptyState from '../components/common/EmptyState'
 import MetricCard from '../components/common/MetricCard'
 import { useCycles } from '../hooks/useCycles'
-import { formatPercent, formatPrice } from '../lib/utils'
+import { formatPercent, formatPrice, formatDateShort } from '../lib/utils'
 
 const HALVINGS = [
   { date: '2012-11-28', label: '1st Halving' },
@@ -30,9 +30,9 @@ function avg(nums: number[]): number {
 export default function Cycles() {
   const { data: cycles, loading } = useCycles()
 
-  const halvingCycles = useMemo(() => cycles?.filter((c) => c.type === 'halving_cycle') || [], [cycles])
-  const bullCycles = useMemo(() => cycles?.filter((c) => c.type === 'bull_market') || [], [cycles])
-  const bearCycles = useMemo(() => cycles?.filter((c) => c.type === 'bear_market') || [], [cycles])
+  const halvingCycles = useMemo(() => cycles?.filter((c) => c.type?.includes('halving')) || [], [cycles])
+  const bullCycles = useMemo(() => cycles?.filter((c) => c.type?.includes('bull')) || [], [cycles])
+  const bearCycles = useMemo(() => cycles?.filter((c) => c.type?.includes('bear')) || [], [cycles])
 
   const daysSinceHalving = useMemo(() => {
     const last = new Date('2024-04-20')
@@ -182,9 +182,9 @@ export default function Cycles() {
               {cycleAnalysis.topToTop.map((t, i) => (
                 <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 bg-bg-tertiary/40 rounded-lg p-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="font-mono text-text-secondary">{t.from.slice(0, 10)}</span>
+                    <span className="font-mono text-text-secondary">{formatDateShort(t.from)}</span>
                     <span className="text-text-muted">→</span>
-                    <span className="font-mono text-text-secondary">{t.to.slice(0, 10)}</span>
+                    <span className="font-mono text-text-secondary">{formatDateShort(t.to)}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-text-muted">{formatPrice(t.priceFrom)} → {formatPrice(t.priceTo)}</span>
@@ -207,9 +207,9 @@ export default function Cycles() {
               {cycleAnalysis.bottomToBottom.map((t, i) => (
                 <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 bg-bg-tertiary/40 rounded-lg p-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="font-mono text-text-secondary">{t.from.slice(0, 10)}</span>
+                    <span className="font-mono text-text-secondary">{formatDateShort(t.from)}</span>
                     <span className="text-text-muted">→</span>
-                    <span className="font-mono text-text-secondary">{t.to.slice(0, 10)}</span>
+                    <span className="font-mono text-text-secondary">{formatDateShort(t.to)}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-text-muted">{formatPrice(t.priceFrom)} → {formatPrice(t.priceTo)}</span>
@@ -232,9 +232,9 @@ export default function Cycles() {
               {cycleAnalysis.topToBottom.map((t, i) => (
                 <div key={i} className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 bg-bg-tertiary/40 rounded-lg p-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="font-mono text-text-secondary">{t.from.slice(0, 10)}</span>
+                    <span className="font-mono text-text-secondary">{formatDateShort(t.from)}</span>
                     <span className="text-text-muted">→</span>
-                    <span className="font-mono text-text-secondary">{t.to.slice(0, 10)}</span>
+                    <span className="font-mono text-text-secondary">{formatDateShort(t.to)}</span>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-xs text-bearish font-mono">{formatPercent(t.drawdown)}</span>
@@ -257,27 +257,27 @@ export default function Cycles() {
               {cycleAnalysis.projNextBottom && cycleAnalysis.lastPeak && (
                 <div className="bg-bg-primary/60 rounded-lg p-4 border border-border">
                   <span className="text-xs text-text-muted block mb-1">Proximo Suelo (desde ultimo techo)</span>
-                  <span className="font-mono text-lg font-bold text-bearish block">{cycleAnalysis.projNextBottom}</span>
+                  <span className="font-mono text-lg font-bold text-bearish block">{formatDateShort(cycleAnalysis.projNextBottom)}</span>
                   <span className="text-xs text-text-secondary">
-                    {cycleAnalysis.lastPeak.date.slice(0, 10)} + {cycleAnalysis.avgTopToBottom}d
+                    {formatDateShort(cycleAnalysis.lastPeak.date)} + {cycleAnalysis.avgTopToBottom}d
                   </span>
                 </div>
               )}
               {cycleAnalysis.projNextBottomFromBottom && cycleAnalysis.lastBottom && (
                 <div className="bg-bg-primary/60 rounded-lg p-4 border border-border">
                   <span className="text-xs text-text-muted block mb-1">Proximo Suelo (desde ultimo suelo)</span>
-                  <span className="font-mono text-lg font-bold text-bearish block">{cycleAnalysis.projNextBottomFromBottom}</span>
+                  <span className="font-mono text-lg font-bold text-bearish block">{formatDateShort(cycleAnalysis.projNextBottomFromBottom)}</span>
                   <span className="text-xs text-text-secondary">
-                    {cycleAnalysis.lastBottom.date.slice(0, 10)} + {cycleAnalysis.avgBottomToBottom}d
+                    {formatDateShort(cycleAnalysis.lastBottom.date)} + {cycleAnalysis.avgBottomToBottom}d
                   </span>
                 </div>
               )}
               {cycleAnalysis.projNextTop && cycleAnalysis.lastPeak && (
                 <div className="bg-bg-primary/60 rounded-lg p-4 border border-border">
                   <span className="text-xs text-text-muted block mb-1">Proximo Techo (desde ultimo techo)</span>
-                  <span className="font-mono text-lg font-bold text-bullish block">{cycleAnalysis.projNextTop}</span>
+                  <span className="font-mono text-lg font-bold text-bullish block">{formatDateShort(cycleAnalysis.projNextTop)}</span>
                   <span className="text-xs text-text-secondary">
-                    {cycleAnalysis.lastPeak.date.slice(0, 10)} + {cycleAnalysis.avgTopToTop}d
+                    {formatDateShort(cycleAnalysis.lastPeak.date)} + {cycleAnalysis.avgTopToTop}d
                   </span>
                 </div>
               )}
@@ -313,8 +313,8 @@ export default function Cycles() {
                     {c.type || '—'}
                   </span>
                 </td>
-                <td className="py-2 pr-4 text-right font-mono text-text-secondary">{c.start_date?.slice(0, 10)}</td>
-                <td className="py-2 pr-4 text-right font-mono text-text-secondary">{c.end_date?.slice(0, 10) || 'ongoing'}</td>
+                <td className="py-2 pr-4 text-right font-mono text-text-secondary">{c.start_date ? formatDateShort(c.start_date) : '—'}</td>
+                <td className="py-2 pr-4 text-right font-mono text-text-secondary">{c.end_date ? formatDateShort(c.end_date) : 'ongoing'}</td>
                 <td className="py-2 pr-4 text-right font-mono">{c.duration_days ? `${c.duration_days}d` : '—'}</td>
                 <td className={`py-2 pr-4 text-right font-mono ${(c.roi_percent || 0) >= 0 ? 'text-bullish' : 'text-bearish'}`}>
                   {c.roi_percent != null ? formatPercent(c.roi_percent) : '—'}

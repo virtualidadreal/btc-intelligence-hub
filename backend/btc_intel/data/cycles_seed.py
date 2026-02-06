@@ -8,6 +8,7 @@ console = Console()
 
 CYCLES = [
     # Halving cycles completos
+    # bottom = bear market low after the peak, NOT the halving date price
     {
         "name": "Ciclo Halving 1 (2012-2016)",
         "type": "halving",
@@ -16,9 +17,9 @@ CYCLES = [
         "btc_price_start": 12.35,
         "btc_price_end": 650.63,
         "btc_price_peak": 1163.00,
-        "btc_price_bottom": 12.35,
+        "btc_price_bottom": 178.10,
         "peak_date": "2013-11-30",
-        "bottom_date": "2012-11-28",
+        "bottom_date": "2015-01-14",
         "duration_days": 1319,
         "roi_percent": 5167.00,
         "max_drawdown": -87.00,
@@ -31,9 +32,9 @@ CYCLES = [
         "btc_price_start": 650.63,
         "btc_price_end": 8607.00,
         "btc_price_peak": 19783.00,
-        "btc_price_bottom": 650.63,
+        "btc_price_bottom": 3200.00,
         "peak_date": "2017-12-17",
-        "bottom_date": "2016-07-09",
+        "bottom_date": "2018-12-15",
         "duration_days": 1402,
         "roi_percent": 1222.00,
         "max_drawdown": -84.00,
@@ -46,9 +47,9 @@ CYCLES = [
         "btc_price_start": 8607.00,
         "btc_price_end": 64000.00,
         "btc_price_peak": 69000.00,
-        "btc_price_bottom": 8607.00,
+        "btc_price_bottom": 15500.00,
         "peak_date": "2021-11-10",
-        "bottom_date": "2020-05-11",
+        "bottom_date": "2022-11-21",
         "duration_days": 1441,
         "roi_percent": 643.00,
         "max_drawdown": -77.00,

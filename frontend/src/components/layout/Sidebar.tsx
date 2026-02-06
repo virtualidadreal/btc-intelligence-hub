@@ -3,6 +3,7 @@ import {
   LayoutDashboard,
   RefreshCcw,
   TrendingUp,
+  CandlestickChart,
   Link2,
   Globe,
   MessageCircle,
@@ -16,6 +17,7 @@ import {
 
 const navItems = [
   { to: '/', label: 'Overview', icon: LayoutDashboard },
+  { to: '/trading', label: 'Trading', icon: CandlestickChart },
   { to: '/cycles', label: 'Ciclos', icon: RefreshCcw },
   { to: '/technical', label: 'Tecnico', icon: TrendingUp },
   { to: '/onchain', label: 'On-Chain', icon: Link2 },
