@@ -59,7 +59,7 @@ export function useSupabaseQuery<T>(
   cacheKeyRef.current = cacheKey
 
   const fetchData = useCallback(async () => {
-    const currentKey = getCacheKey(deps)
+    const currentKey = cacheKeyRef.current
 
     // If cache is fresh, skip network request
     if (isCacheFresh(currentKey)) {
@@ -86,7 +86,6 @@ export function useSupabaseQuery<T>(
         if (result.data !== null) {
           setCache(currentKey, result.data)
         }
-        // Only update state if the cache key hasn't changed during the fetch
         if (cacheKeyRef.current === currentKey) {
           setData(result.data)
         }
