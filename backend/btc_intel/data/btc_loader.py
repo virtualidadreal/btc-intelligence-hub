@@ -22,14 +22,13 @@ async def load_btc_prices(since: date | None = None) -> int:
     if since is None:
         result = db.table("btc_prices").select("date").order("date", desc=True).limit(1).execute()
         if result.data:
-            since = date.fromisoformat(result.data[0]["date"]) + timedelta(days=1)
+            last_date = date.fromisoformat(result.data[0]["date"])
+            # Always re-fetch today to get the latest intraday price
+            since = min(last_date, date.today())
         else:
             since = date(2014, 9, 17)  # Yahoo Finance BTC-USD start
 
     today = date.today()
-    if since >= today:
-        console.print("[green]BTC prices ya están actualizados[/green]")
-        return 0
 
     console.print(f"[cyan]Descargando BTC OHLCV ({since} → {today})...[/cyan]")
 
