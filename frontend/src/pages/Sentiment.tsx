@@ -3,6 +3,7 @@ import { ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, AreaChart, A
 import MetricCard from '../components/common/MetricCard'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import HelpButton from '../components/common/HelpButton'
 import ChartContainer from '../components/common/ChartContainer'
 import { useLatestSentiment, useSentimentHistory } from '../hooks/useSentiment'
 
@@ -22,8 +23,20 @@ export default function Sentiment() {
   if (!fg) return <div className="p-6"><PageHeader title="Sentiment" /><EmptyState command="btc-intel analyze sentiment" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Sentiment Analysis" subtitle="Fear & Greed Index" />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Sentiment Analysis" subtitle="Fear & Greed Index">
+        <HelpButton
+          title="Analisis de Sentimiento"
+          content={[
+            "El sentimiento del mercado medido por el indice Fear & Greed de Alternative.me.",
+            "Fear & Greed Index: Escala de 0 a 100. 0 = Miedo Extremo (el mercado tiene panico, posible oportunidad de compra). 100 = Codicia Extrema (el mercado esta euforico, posible momento de venta).",
+            "30D Average: Media movil de 30 dias del indice. Suaviza el ruido diario y muestra la tendencia general del sentimiento.",
+            "Zone: Clasificacion del nivel actual: Extreme Fear (<20), Fear (20-40), Neutral (40-60), Greed (60-80), Extreme Greed (>80).",
+            "Divergence: Diferencia entre el valor actual y la media de 30 dias. Valores positivos indican que el sentimiento esta mas alto de lo normal.",
+            "Historicamente, comprar en Extreme Fear y vender en Extreme Greed ha sido una estrategia rentable a largo plazo.",
+          ]}
+        />
+      </PageHeader>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* Fear & Greed Gauge */}

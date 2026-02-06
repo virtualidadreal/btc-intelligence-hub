@@ -16,7 +16,7 @@ export default function MetricCard({ title, value, change, signal, icon, subtitl
         <span className="text-sm text-text-secondary">{title}</span>
         {icon && <span className="text-text-muted">{icon}</span>}
       </div>
-      <div className="font-mono text-xl font-bold text-text-primary">{value}</div>
+      <div className="font-mono text-lg md:text-xl font-bold text-text-primary truncate">{value}</div>
       <div className="flex items-center gap-2 mt-1">
         {change && (
           <span className={cn('text-sm font-mono', change.startsWith('+') ? 'text-bullish' : change.startsWith('-') ? 'text-bearish' : 'text-text-secondary')}>

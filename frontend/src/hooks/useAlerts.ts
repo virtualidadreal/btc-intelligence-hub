@@ -10,5 +10,7 @@ export function useActiveAlerts() {
         .eq('acknowledged', false)
         .order('date', { ascending: false })
         .limit(50),
+    [],
+    'active-alerts',
   )
 }

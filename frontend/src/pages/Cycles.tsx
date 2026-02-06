@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import PageHeader from '../components/common/PageHeader'
+import HelpButton from '../components/common/HelpButton'
 import EmptyState from '../components/common/EmptyState'
 import MetricCard from '../components/common/MetricCard'
 import { useCycles } from '../hooks/useCycles'
@@ -28,8 +29,20 @@ export default function Cycles() {
   if (!cycles?.length) return <div className="p-6"><PageHeader title="Cycles" /><EmptyState command="btc-intel seed-all" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Cycle Analysis" subtitle="Halvings, bull/bear markets" />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Cycle Analysis" subtitle="Halvings, bull/bear markets">
+        <HelpButton
+          title="Analisis de Ciclos"
+          content={[
+            "Historial de ciclos de Bitcoin basados en los halvings (reduccion de recompensa de mineria a la mitad cada ~4 anos).",
+            "Halving Timeline: Muestra los 4 halvings historicos. El punto naranja pulsante indica el halving actual (2024). Los ciclos de mercado de BTC han seguido historicamente un patron de ~4 anos alrededor de cada halving.",
+            "Days Since Halving: Dias desde el ultimo halving. Historicamente, los picos de precio ocurren 500-600 dias despues del halving.",
+            "All Cycles: Tabla con todos los ciclos registrados, incluyendo ROI (retorno) y Max Drawdown (caida maxima). El ROI muestra cuanto subio BTC desde el inicio hasta el pico del ciclo.",
+            "Los tipos de ciclo son: halving (ciclo completo entre halvings), bull_market (fase alcista) y bear_market (fase bajista).",
+            "Patron historico: Cada ciclo de halving ha producido rendimientos menores que el anterior (5167%, 1222%, 643%), lo que sugiere rendimientos decrecientes.",
+          ]}
+        />
+      </PageHeader>
 
       {/* Halving Timeline */}
       <div className="rounded-xl bg-bg-secondary/60 border border-border p-6 backdrop-blur-sm">
@@ -77,8 +90,8 @@ export default function Cycles() {
               <tr key={c.id} className="border-b border-border/50 hover:bg-bg-tertiary/30">
                 <td className="py-2 pr-4 font-mono">{c.name}</td>
                 <td className="py-2 pr-4">
-                  <span className={`text-xs px-1.5 py-0.5 rounded ${c.type.includes('bull') ? 'bg-bullish/20 text-bullish' : c.type.includes('bear') ? 'bg-bearish/20 text-bearish' : 'bg-accent-btc/20 text-accent-btc'}`}>
-                    {c.type}
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${c.type?.includes('bull') ? 'bg-bullish/20 text-bullish' : c.type?.includes('bear') ? 'bg-bearish/20 text-bearish' : 'bg-accent-btc/20 text-accent-btc'}`}>
+                    {c.type || '—'}
                   </span>
                 </td>
                 <td className="py-2 pr-4 text-right font-mono text-text-secondary">{c.start_date?.slice(0, 10)}</td>

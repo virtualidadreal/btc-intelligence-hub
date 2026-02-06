@@ -4,6 +4,7 @@ import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianG
 import MetricCard from '../components/common/MetricCard'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import HelpButton from '../components/common/HelpButton'
 import ChartContainer from '../components/common/ChartContainer'
 import { useLatestCycleScore, useCycleScoreHistory } from '../hooks/useCycleScore'
 import { formatDate } from '../lib/utils'
@@ -58,8 +59,20 @@ export default function CycleScore() {
   const phaseColor = PHASE_COLORS[cs.phase || ''] || '#f7931a'
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Cycle Score" subtitle="Composite indicator 0-100" />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Cycle Score" subtitle="Composite indicator 0-100">
+        <HelpButton
+          title="Cycle Score - Indicador de Ciclo"
+          content={[
+            "El Cycle Score es un indicador compuesto propietario que condensa multiples metricas en un numero entre 0 y 100, indicando donde estamos en el ciclo de mercado de Bitcoin.",
+            "0 = Bottom absoluto / maxima oportunidad de compra. 100 = Top absoluto / maximo riesgo.",
+            "Fases: Capitulacion (0-14), Acumulacion (15-29), Bull Temprano (30-44), Bull Medio (45-59), Bull Tardio (60-74), Distribucion (75-84), Euforia (85-100).",
+            "Componentes: SMA Position (20%), Price Position (20%), Halving Position (15%), RSI Mensual (10%), Hash Rate Momentum (10%), Fear & Greed (5%), F&G 30D (5%).",
+            "Las barras de componentes muestran cuanto aporta cada metrica al score total. Verde = bajo riesgo, Naranja = cautela, Rojo = alto riesgo.",
+            "IMPORTANTE: No es predictivo. Indica DONDE estamos en el ciclo, no donde iremos. Usalo como contexto, no como senal de trading.",
+          ]}
+        />
+      </PageHeader>
 
       {/* Score Gauge */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

@@ -3,6 +3,7 @@ import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianG
 import MetricCard from '../components/common/MetricCard'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import HelpButton from '../components/common/HelpButton'
 import ChartContainer from '../components/common/ChartContainer'
 import { useLatestOnchain, useOnchainHistory } from '../hooks/useOnchain'
 
@@ -22,8 +23,20 @@ export default function OnChain() {
   if (!latest?.length) return <div className="p-6"><PageHeader title="On-Chain" /><EmptyState command="btc-intel analyze onchain" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="On-Chain Metrics" subtitle="Hash rate, NVT, network health" />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="On-Chain Metrics" subtitle="Hash rate, NVT, network health">
+        <HelpButton
+          title="Metricas On-Chain"
+          content={[
+            "Datos directos de la blockchain de Bitcoin que muestran la salud de la red.",
+            "Hash Rate: Potencia computacional total de la red Bitcoin en Exahashes/segundo. Un hash rate creciente indica una red mas segura y mineros optimistas.",
+            "HR Momentum 30D: Cambio porcentual del hash rate en los ultimos 30 dias. Positivo = red creciendo, Negativo = mineros abandonando (posible senal de estres).",
+            "NVT Ratio (Network Value to Transactions): Similar al P/E ratio en acciones. Compara la capitalizacion de mercado con el volumen de transacciones. NVT alto = red sobrevalorada, NVT bajo = red infravalorada.",
+            "Signals: Las senales se generan automaticamente basandose en umbrales historicos de cada metrica.",
+            "Estas metricas son fundamentales porque reflejan la actividad REAL en la blockchain, no solo especulacion en exchanges.",
+          ]}
+        />
+      </PageHeader>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <MetricCard title="Hash Rate" value={hashRate ? `${(hashRate.value / 1e18).toFixed(1)} EH/s` : 'N/A'} signal={hrMom?.signal} />
         <MetricCard title="HR Momentum 30D" value={hrMom ? `${hrMom.value.toFixed(2)}%` : 'N/A'} signal={hrMom?.signal} />

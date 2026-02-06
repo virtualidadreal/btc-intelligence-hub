@@ -5,6 +5,7 @@ import MetricCard, { SignalBadge } from '../components/common/MetricCard'
 import { CardSkeleton } from '../components/common/LoadingSkeleton'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import HelpButton from '../components/common/HelpButton'
 import { usePriceChanges } from '../hooks/usePrices'
 import { useLatestCycleScore } from '../hooks/useCycleScore'
 import { useLatestSignals } from '../hooks/useTechnical'
@@ -64,25 +65,37 @@ export default function Overview() {
   if (!priceData) return <div className="p-6"><EmptyState command="btc-intel update-data" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Overview" subtitle="BTC Intelligence Hub" />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Overview" subtitle="BTC Intelligence Hub">
+        <HelpButton
+          title="Overview - Vista General"
+          content={[
+            "Panel principal con el resumen del estado actual de Bitcoin.",
+            "Precio BTC: Precio actual con cambios en 24h, 7d y 30d. La mini-grafica muestra la tendencia de los ultimos 7 dias.",
+            "Cycle Score: Indicador compuesto 0-100 que mide en que fase del ciclo de mercado estamos. Mas bajo = mejor momento de compra, mas alto = mas riesgo.",
+            "Fear & Greed: Indice de sentimiento del mercado (0=miedo extremo, 100=codicia extrema). Valores bajos suelen ser buenas oportunidades.",
+            "Signals: Senales tecnicas de RSI, MACD y cruce de medias moviles. Verde=alcista, Rojo=bajista.",
+            "Los datos se actualizan con: btc-intel update-data && btc-intel analyze full",
+          ]}
+        />
+      </PageHeader>
 
       {/* Price Hero */}
-      <div className="rounded-xl bg-bg-secondary/60 border border-border p-6 backdrop-blur-sm">
-        <div className="flex items-center justify-between">
+      <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 md:p-6 backdrop-blur-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <Bitcoin className="w-8 h-8 text-accent-btc" />
-              <span className="font-mono text-4xl font-bold">{formatPrice(priceData.current)}</span>
+              <Bitcoin className="w-6 h-6 md:w-8 md:h-8 text-accent-btc" />
+              <span className="font-mono text-2xl md:text-4xl font-bold">{formatPrice(priceData.current)}</span>
             </div>
-            <div className="flex gap-4 text-sm font-mono">
+            <div className="flex gap-3 md:gap-4 text-xs md:text-sm font-mono">
               <span className={priceData.day >= 0 ? 'text-bullish' : 'text-bearish'}>24h: {formatPercent(priceData.day)}</span>
               <span className={priceData.week >= 0 ? 'text-bullish' : 'text-bearish'}>7d: {formatPercent(priceData.week)}</span>
               <span className={priceData.month >= 0 ? 'text-bullish' : 'text-bearish'}>30d: {formatPercent(priceData.month)}</span>
             </div>
           </div>
           {sparkline.length > 0 && (
-            <div className="w-32 h-12">
+            <div className="w-full sm:w-32 h-12">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={sparkline}>
                   <Line type="monotone" dataKey="v" stroke={priceData.week >= 0 ? '#22c55e' : '#ef4444'} strokeWidth={2} dot={false} />

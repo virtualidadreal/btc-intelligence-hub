@@ -10,6 +10,8 @@ export function useLatestMacro() {
         .in('asset', ['SPX', 'GOLD', 'DXY', 'US_10Y'])
         .order('date', { ascending: false })
         .limit(20),
+    [],
+    'latest-macro',
   )
 }
 
@@ -22,6 +24,8 @@ export function useCorrelations() {
         .like('indicator', 'CORR_BTC_%')
         .order('date', { ascending: false })
         .limit(50),
+    [],
+    'correlations',
   )
 }
 
@@ -35,5 +39,6 @@ export function useMacroHistory(asset: string, limit = 365) {
         .order('date', { ascending: false })
         .limit(limit),
     [asset, limit],
+    `macro-history-${asset}-${limit}`,
   )
 }

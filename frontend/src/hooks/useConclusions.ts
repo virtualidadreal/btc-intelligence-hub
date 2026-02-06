@@ -10,5 +10,5 @@ export function useConclusions(category?: string, limit = 50) {
       .order('created_at', { ascending: false })
     if (category) query = query.eq('category', category)
     return query.limit(limit)
-  }, [category, limit])
+  }, [category, limit], `conclusions-${category}-${limit}`)
 }

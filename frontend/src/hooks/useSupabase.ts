@@ -47,8 +47,9 @@ function setCache<T>(key: string, data: T): void {
 export function useSupabaseQuery<T>(
   queryFn: QueryFn<T>,
   deps: unknown[] = [],
+  key?: string,
 ): UseSupabaseResult<T> {
-  const cacheKey = getCacheKey(deps)
+  const cacheKey = key || getCacheKey(deps)
   const cachedData = getCached<T>(cacheKey)
 
   const [data, setData] = useState<T | null>(cachedData)

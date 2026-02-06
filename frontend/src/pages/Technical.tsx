@@ -4,6 +4,7 @@ import { SignalBadge } from '../components/common/MetricCard'
 import { CardSkeleton } from '../components/common/LoadingSkeleton'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import HelpButton from '../components/common/HelpButton'
 import ChartContainer from '../components/common/ChartContainer'
 import { useIndicatorHistory, useLatestSignals } from '../hooks/useTechnical'
 import { usePriceHistory } from '../hooks/usePrices'
@@ -35,8 +36,20 @@ export default function Technical() {
   if (!rsiData?.length) return <div className="p-6"><PageHeader title="Technical" /><EmptyState command="btc-intel analyze technical" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Technical Analysis" subtitle="Indicadores tecnico y signals" />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Technical Analysis" subtitle="Indicadores tecnicos y signals">
+        <HelpButton
+          title="Analisis Tecnico"
+          content={[
+            "Indicadores tecnicos calculados sobre el precio historico de BTC.",
+            "RSI (14): Relative Strength Index. Mide la fuerza del movimiento. Por encima de 70 = sobrecompra (posible correccion), por debajo de 30 = sobreventa (posible rebote).",
+            "MACD: Moving Average Convergence Divergence. Barras verdes/positivas = momentum alcista, rojas/negativas = momentum bajista. Los cruces de linea indican cambios de tendencia.",
+            "SMA Cross: Cruce de medias moviles SMA 50 y SMA 200. Golden Cross (50 cruza por encima de 200) = senal alcista. Death Cross = senal bajista.",
+            "Signals: Cada indicador genera una senal (bullish/bearish/neutral) basada en umbrales predefinidos.",
+            "El grafico de precio muestra la evolucion de BTC en el ultimo ano con las medias moviles superpuestas.",
+          ]}
+        />
+      </PageHeader>
 
       {/* Latest Signals */}
       {signals && signals.length > 0 && (

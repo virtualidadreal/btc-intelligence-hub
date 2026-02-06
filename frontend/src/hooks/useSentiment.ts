@@ -10,6 +10,8 @@ export function useLatestSentiment() {
         .in('metric', ['FEAR_GREED', 'FEAR_GREED_30D'])
         .order('date', { ascending: false })
         .limit(5),
+    [],
+    'latest-sentiment',
   )
 }
 
@@ -23,5 +25,6 @@ export function useSentimentHistory(metric: string, limit = 365) {
         .order('date', { ascending: false })
         .limit(limit),
     [metric, limit],
+    `sentiment-history-${metric}-${limit}`,
   )
 }

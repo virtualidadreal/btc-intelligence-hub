@@ -10,5 +10,6 @@ export function useReports(limit = 20) {
         .order('created_at', { ascending: false })
         .limit(limit),
     [limit],
+    `reports-${limit}`,
   )
 }

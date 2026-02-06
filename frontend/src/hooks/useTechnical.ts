@@ -10,6 +10,8 @@ export function useLatestIndicators() {
         .in('indicator', ['RSI_14', 'MACD', 'SMA_CROSS', 'SMA_50', 'SMA_200', 'EMA_21', 'ATR_14', 'BB_UPPER', 'BB_LOWER', 'BB_MID'])
         .order('date', { ascending: false })
         .limit(30),
+    [],
+    'latest-indicators',
   )
 }
 
@@ -23,6 +25,7 @@ export function useIndicatorHistory(indicator: string, limit = 365) {
         .order('date', { ascending: false })
         .limit(limit),
     [indicator, limit],
+    `indicator-history-${indicator}-${limit}`,
   )
 }
 
@@ -35,5 +38,7 @@ export function useLatestSignals() {
         .in('indicator', ['RSI_14', 'MACD', 'SMA_CROSS'])
         .order('date', { ascending: false })
         .limit(10),
+    [],
+    'latest-signals',
   )
 }

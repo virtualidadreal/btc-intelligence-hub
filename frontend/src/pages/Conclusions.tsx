@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Bot, User, Tag } from 'lucide-react'
 import EmptyState from '../components/common/EmptyState'
+import HelpButton from '../components/common/HelpButton'
 import PageHeader from '../components/common/PageHeader'
 import { useConclusions } from '../hooks/useConclusions'
 import { formatDate } from '../lib/utils'
@@ -18,14 +19,27 @@ export default function Conclusions() {
   const accuracy = validated.length > 0 ? ((correct / validated.length) * 100).toFixed(0) : 'N/A'
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <PageHeader title="Conclusions" subtitle="Intelligence journal">
-        {validated.length > 0 && (
-          <div className="text-right">
-            <span className="text-2xl font-mono font-bold text-accent-btc">{accuracy}%</span>
-            <span className="text-xs text-text-muted block">accuracy ({validated.length} validated)</span>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          {validated.length > 0 && (
+            <div className="text-right">
+              <span className="text-2xl font-mono font-bold text-accent-btc">{accuracy}%</span>
+              <span className="text-xs text-text-muted block">accuracy ({validated.length} validated)</span>
+            </div>
+          )}
+          <HelpButton
+            title="Sistema de Conclusiones"
+            content={[
+              "Diario de inteligencia donde se registran analisis y predicciones sobre Bitcoin para tracking y validacion posterior.",
+              "Cada conclusion incluye: titulo, contenido del analisis, categoria (technical/onchain/macro/sentiment/cycle), nivel de confianza (1-10), y tags.",
+              "Data Snapshot: Al crear una conclusion, se guarda automaticamente el precio de BTC, Cycle Score y RSI de ese momento para contexto futuro.",
+              "Validacion: Las conclusiones se pueden validar como correct/incorrect/partial cuando pasa el tiempo y se conoce el resultado real.",
+              "Accuracy: El porcentaje muestra la precision de tus predicciones validadas. Se calcula como (correctas + 0.5*parciales) / total.",
+              "Usa 'btc-intel conclude --add texto --title titulo' para crear conclusiones y 'btc-intel conclude --validate ID --outcome correct' para validarlas.",
+            ]}
+          />
+        </div>
       </PageHeader>
 
       {/* Filters */}

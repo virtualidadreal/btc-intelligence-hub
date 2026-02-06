@@ -1,4 +1,5 @@
 import { AlertTriangle, CheckCircle, Info } from 'lucide-react'
+import HelpButton from '../components/common/HelpButton'
 import PageHeader from '../components/common/PageHeader'
 import { useActiveAlerts } from '../hooks/useAlerts'
 import { formatDate } from '../lib/utils'
@@ -15,8 +16,20 @@ export default function Alerts() {
   if (loading) return <div className="p-6"><PageHeader title="Alerts" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Alerts" subtitle={`${alerts?.length || 0} active alerts`} />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Alerts" subtitle={`${alerts?.length || 0} active alerts`}>
+        <HelpButton
+          title="Sistema de Alertas"
+          content={[
+            "Alertas automaticas generadas por el motor de deteccion de patrones y el Cycle Score.",
+            "Las alertas se crean cuando se detectan condiciones importantes: Cycle Score > 85 (euforia, senal de precaucion), Cycle Score < 15 (capitulacion, posible oportunidad), patrones tecnicos significativos.",
+            "Severidad: Critical (rojo) = requiere atencion inmediata. Warning (naranja) = vigilar de cerca. Info (azul) = informativo.",
+            "Signal: Cada alerta incluye una senal (bullish/bearish) indicando la direccion esperada del movimiento.",
+            "Las alertas no reconocidas permanecen activas. Usa 'btc-intel alerts ack [id]' para marcarlas como leidas.",
+            "Se comprueban automaticamente con: btc-intel alerts check (tambien integrado en la rutina btc-intel morning).",
+          ]}
+        />
+      </PageHeader>
       {!alerts?.length ? (
         <div className="rounded-xl bg-bg-secondary/60 border border-border p-8 backdrop-blur-sm text-center">
           <CheckCircle className="w-12 h-12 text-bullish mx-auto mb-3" />

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FileText } from 'lucide-react'
 import EmptyState from '../components/common/EmptyState'
+import HelpButton from '../components/common/HelpButton'
 import PageHeader from '../components/common/PageHeader'
 import { useReports } from '../hooks/useReports'
 import { formatDate } from '../lib/utils'
@@ -14,8 +15,20 @@ export default function Reports() {
   if (loading) return <div className="p-6"><PageHeader title="Reports" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Reports" subtitle={`${reports?.length || 0} reports generated`} />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Reports" subtitle={`${reports?.length || 0} reports generated`}>
+        <HelpButton
+          title="Informes Generados"
+          content={[
+            "Informes completos generados automaticamente por el sistema de analisis.",
+            "Tipos de informe: daily (resumen diario), weekly (analisis semanal completo), cycle (estado del ciclo actual), macro (contexto macroeconomico).",
+            "Cada informe incluye datos de precio, indicadores tecnicos, metricas on-chain, sentimiento y el Cycle Score del momento.",
+            "Los informes se generan con: btc-intel report --type daily (o weekly/cycle/macro).",
+            "Tambien se crean automaticamente durante las rutinas btc-intel morning (diario) y btc-intel weekly (semanal).",
+            "Selecciona un informe de la lista para ver su contenido completo en el panel derecho.",
+          ]}
+        />
+      </PageHeader>
 
       {!reports?.length ? (
         <EmptyState message="No reports" command="btc-intel report --type daily" />

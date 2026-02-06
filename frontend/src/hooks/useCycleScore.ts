@@ -9,6 +9,8 @@ export function useLatestCycleScore() {
         .select('*')
         .order('date', { ascending: false })
         .limit(1),
+    [],
+    'latest-cycle-score',
   )
 }
 
@@ -21,5 +23,6 @@ export function useCycleScoreHistory(limit = 90) {
         .order('date', { ascending: false })
         .limit(limit),
     [limit],
+    `cycle-score-history-${limit}`,
   )
 }

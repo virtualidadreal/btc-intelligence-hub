@@ -3,6 +3,7 @@ import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianG
 import MetricCard from '../components/common/MetricCard'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import HelpButton from '../components/common/HelpButton'
 import ChartContainer from '../components/common/ChartContainer'
 import { usePriceHistory } from '../hooks/usePrices'
 
@@ -42,8 +43,20 @@ export default function Risk() {
   if (!riskData) return <div className="p-6"><PageHeader title="Risk" /><EmptyState command="btc-intel analyze risk" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Risk Analysis" subtitle="Drawdown, volatility, Sharpe, VaR" />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Risk Analysis" subtitle="Drawdown, volatility, Sharpe, VaR">
+        <HelpButton
+          title="Analisis de Riesgo"
+          content={[
+            "Metricas de riesgo calculadas sobre el precio historico de BTC.",
+            "Current Drawdown: Caida actual desde el ultimo maximo historico. Ejemplo: -15% significa que el precio esta un 15% por debajo de su pico.",
+            "Max Drawdown: La mayor caida desde maximo en el periodo analizado. Indica el peor escenario historico.",
+            "Volatilidad 30D (Anualizada): Cuanto varia el precio en 30 dias, proyectado a un ano. BTC tipicamente tiene 50-80% de volatilidad anual.",
+            "Sharpe Ratio (365D): Mide el retorno ajustado por riesgo. Mayor que 1 = buen rendimiento por unidad de riesgo. Negativo = perdidas.",
+            "VaR 95% (diario): Value at Risk. Con 95% de confianza, la perdida maxima esperada en un dia. Ejemplo: -3.5% significa que solo 1 de cada 20 dias deberia caer mas que eso.",
+          ]}
+        />
+      </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <MetricCard title="Current Drawdown" value={`${riskData.currentDD.toFixed(2)}%`} signal={riskData.currentDD < -20 ? 'extreme_bearish' : riskData.currentDD < -10 ? 'bearish' : undefined} />

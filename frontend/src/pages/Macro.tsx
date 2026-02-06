@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import MetricCard from '../components/common/MetricCard'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
+import HelpButton from '../components/common/HelpButton'
 import { useCorrelations } from '../hooks/useMacro'
 
 export default function Macro() {
@@ -29,10 +30,22 @@ export default function Macro() {
   if (!correlations?.length) return <div className="p-6"><PageHeader title="Macro" /><EmptyState command="btc-intel analyze macro" /></div>
 
   return (
-    <div className="p-6 space-y-6">
-      <PageHeader title="Macro Analysis" subtitle="BTC correlations with traditional assets" />
+    <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+      <PageHeader title="Macro Analysis" subtitle="BTC correlations with traditional assets">
+        <HelpButton
+          title="Analisis Macro"
+          content={[
+            "Correlaciones entre Bitcoin y activos tradicionales calculadas sobre ventanas de 30 y 90 dias.",
+            "SPX (S&P 500): Indice de las 500 mayores empresas de EEUU. Correlacion positiva = BTC se mueve con las acciones. En 2022-2024, BTC ha mostrado alta correlacion con SPX.",
+            "GOLD (Oro): Reserva de valor tradicional. BTC compite con el oro como 'oro digital'. Correlacion positiva indica que ambos actuan como cobertura.",
+            "DXY (Indice Dolar): Mide la fuerza del dolar. Correlacion tipicamente NEGATIVA: cuando el dolar sube, BTC tiende a bajar y viceversa.",
+            "US_10Y (Bono 10 anos): Rendimiento del bono del Tesoro a 10 anos. Tipos altos suelen presionar activos de riesgo como BTC.",
+            "Valores cercanos a +1 o -1 indican correlacion fuerte. Cercanos a 0 = poca relacion. La matriz muestra las correlaciones cruzadas a 30 dias.",
+          ]}
+        />
+      </PageHeader>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {corrByAsset.map((c) => (
           <MetricCard
             key={c.asset}
@@ -47,7 +60,7 @@ export default function Macro() {
       {/* Correlation Heatmap */}
       <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
         <h3 className="font-display font-semibold mb-4">Correlation Matrix (30D)</h3>
-        <div className="grid grid-cols-5 gap-1 text-center text-xs font-mono">
+        <div className="grid grid-cols-3 md:grid-cols-5 gap-1 text-center text-xs font-mono">
           <div />
           {corrByAsset.map((c) => <div key={c.asset} className="text-text-muted py-1">{c.asset}</div>)}
           {corrByAsset.map((row) => (
