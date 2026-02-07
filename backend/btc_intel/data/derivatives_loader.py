@@ -1,4 +1,4 @@
-"""Derivatives Loader — Funding Rate & Open Interest from Bybit (free, no auth, no geo-block)."""
+"""Derivatives Loader — Funding Rate & Open Interest from OKX (free, no auth, global access)."""
 
 from datetime import date
 
@@ -9,34 +9,38 @@ from btc_intel.db import get_supabase
 
 console = Console()
 
-BYBIT_BASE = "https://api.bybit.com"
+HEADERS = {"User-Agent": "btc-intel/1.0"}
 
 
 async def load_derivatives_data() -> int:
-    """Load funding rate and open interest from Bybit public API."""
+    """Load funding rate and open interest from OKX public API."""
     db = get_supabase()
     total = 0
 
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=30, headers=HEADERS) as client:
         # --- Funding Rate ---
         try:
             resp = await client.get(
-                f"{BYBIT_BASE}/v5/market/funding/history",
-                params={"category": "linear", "symbol": "BTCUSDT", "limit": 1},
+                "https://www.okx.com/api/v5/public/funding-rate",
+                params={"instId": "BTC-USDT-SWAP"},
             )
             resp.raise_for_status()
             data = resp.json()
-            items = data.get("result", {}).get("list", [])
+            items = data.get("data", [])
 
             if items:
-                funding_rate = float(items[0]["fundingRate"]) * 100  # to percentage
+                # settFundingRate = last settled rate, fundingRate = current predicted
+                settled = items[0].get("settFundingRate", "")
+                current = items[0].get("fundingRate", "")
+                rate_str = settled if settled else current
+                funding_rate = float(rate_str) * 100 if rate_str else 0  # to percentage
 
                 record = {
                     "date": date.today().isoformat(),
                     "metric": "FUNDING_RATE",
                     "value": funding_rate,
                     "signal": _classify_funding_rate(funding_rate),
-                    "source": "bybit",
+                    "source": "okx",
                 }
                 db.table("onchain_metrics").upsert(
                     record, on_conflict="date,metric"
@@ -49,41 +53,29 @@ async def load_derivatives_data() -> int:
         # --- Open Interest ---
         try:
             resp = await client.get(
-                f"{BYBIT_BASE}/v5/market/open-interest",
-                params={"category": "linear", "symbol": "BTCUSDT", "intervalTime": "1h", "limit": 1},
+                "https://www.okx.com/api/v5/public/open-interest",
+                params={"instType": "SWAP", "instId": "BTC-USDT-SWAP"},
             )
             resp.raise_for_status()
             data = resp.json()
-            items = data.get("result", {}).get("list", [])
+            items = data.get("data", [])
 
             if items:
-                oi_value = float(items[0]["openInterest"])  # in USD for linear
-
-                # Get price for reference
-                ticker_resp = await client.get(
-                    f"{BYBIT_BASE}/v5/market/tickers",
-                    params={"category": "linear", "symbol": "BTCUSDT"},
-                )
-                ticker_resp.raise_for_status()
-                ticker_data = ticker_resp.json()
-                ticker_list = ticker_data.get("result", {}).get("list", [])
-                price = float(ticker_list[0]["lastPrice"]) if ticker_list else 0
-
-                # Bybit linear OI is in coins, multiply by price for USD
-                oi_usd = oi_value * price if price > 0 else oi_value
+                oi_usd = float(items[0].get("oiUsd", 0))
 
                 record = {
                     "date": date.today().isoformat(),
                     "metric": "OPEN_INTEREST",
                     "value": oi_usd,
                     "signal": None,  # Signal computed in analysis step
-                    "source": "bybit",
+                    "source": "okx",
                 }
                 db.table("onchain_metrics").upsert(
                     record, on_conflict="date,metric"
                 ).execute()
                 total += 1
-                console.print(f"  Open Interest: {oi_value:.2f} BTC (${oi_usd:,.0f})")
+                oi_btc = float(items[0].get("oiCcy", 0))
+                console.print(f"  Open Interest: {oi_btc:.2f} BTC (${oi_usd:,.0f})")
         except Exception as e:
             console.print(f"  [yellow]Open Interest error: {e}[/yellow]")
 
