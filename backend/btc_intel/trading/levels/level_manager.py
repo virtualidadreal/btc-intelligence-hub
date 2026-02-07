@@ -297,19 +297,15 @@ def _persist_levels(levels: list[PriceLevel], zones: list[Zone]) -> None:
                 "type": lv.type,
                 "strength": lv.strength,
                 "classification": classification,
-                "sources": lv.source,
+                "source": lv.source,
                 "timeframes": lv.timeframes,
                 "touch_count": lv.touch_count,
                 "last_touch_date": lv.last_touch_date,
-                "visible_in_timeframes": lv.visible_in_timeframes,
-                "coincides_with_fib": lv.coincides_with_fib,
                 "fib_level": lv.fib_level,
                 "is_role_flip": lv.is_role_flip,
-                "flip_date": lv.flip_date,
-                "is_high_volume_zone": lv.is_high_volume_zone,
+                "is_high_volume": lv.is_high_volume_zone,
                 "is_psychological": lv.is_psychological,
-                "last_touch_days": lv.last_touch_days,
-                "scanned_at": now,
+                "updated_at": now,
             }
         )
 
