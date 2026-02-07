@@ -6,8 +6,10 @@ import PageHeader from '../components/common/PageHeader'
 import HelpButton from '../components/common/HelpButton'
 import ChartContainer from '../components/common/ChartContainer'
 import { usePriceHistory } from '../hooks/usePrices'
+import { useI18n } from '../lib/i18n'
 
 export default function Risk() {
+  const { t, ta } = useI18n()
   const { data: prices, loading } = usePriceHistory(365)
 
   const riskData = useMemo(() => {
@@ -48,56 +50,49 @@ export default function Risk() {
     const var95 = riskData.var95
 
     // Drawdown
-    if (dd > -5) result.push({ type: 'bullish', text: `Drawdown minimo (${dd.toFixed(2)}%): BTC cerca de maximos, tendencia fuerte` })
-    else if (dd >= -15) result.push({ type: 'neutral', text: `Drawdown moderado (${dd.toFixed(2)}%): correccion saludable dentro de tendencia` })
-    else if (dd >= -30) result.push({ type: 'bearish', text: `Drawdown significativo (${dd.toFixed(2)}%): correccion profunda, posible cambio de tendencia` })
-    else result.push({ type: 'bearish', text: `Drawdown severo (${dd.toFixed(2)}%): mercado en fase bajista, extrema precaucion` })
+    if (dd > -5) result.push({ type: 'bullish', text: `${t('risk.minimalDD')} (${dd.toFixed(2)}%): ${t('risk.minimalDDDesc')}` })
+    else if (dd >= -15) result.push({ type: 'neutral', text: `${t('risk.moderateDD')} (${dd.toFixed(2)}%): ${t('risk.moderateDDDesc')}` })
+    else if (dd >= -30) result.push({ type: 'bearish', text: `${t('risk.significantDD')} (${dd.toFixed(2)}%): ${t('risk.significantDDDesc')}` })
+    else result.push({ type: 'bearish', text: `${t('risk.severeDD')} (${dd.toFixed(2)}%): ${t('risk.severeDDDesc')}` })
 
     // Volatility
-    if (vol < 40) result.push({ type: 'bullish', text: `Volatilidad baja (${vol.toFixed(1)}%): mercado estable, posible acumulacion` })
-    else if (vol <= 70) result.push({ type: 'neutral', text: `Volatilidad media (${vol.toFixed(1)}%): niveles normales para BTC` })
-    else result.push({ type: 'bearish', text: `Volatilidad alta (${vol.toFixed(1)}%): mercado inestable, mayor riesgo en operaciones` })
+    if (vol < 40) result.push({ type: 'bullish', text: `${t('risk.lowVol')} (${vol.toFixed(1)}%): ${t('risk.lowVolDesc')}` })
+    else if (vol <= 70) result.push({ type: 'neutral', text: `${t('risk.medVol')} (${vol.toFixed(1)}%): ${t('risk.medVolDesc')}` })
+    else result.push({ type: 'bearish', text: `${t('risk.highVol')} (${vol.toFixed(1)}%): ${t('risk.highVolDesc')}` })
 
     // Sharpe
-    if (sharpe > 2) result.push({ type: 'bullish', text: `Sharpe ratio excelente (${sharpe.toFixed(2)}): retornos excepcionales ajustados por riesgo` })
-    else if (sharpe >= 1) result.push({ type: 'bullish', text: `Sharpe ratio bueno (${sharpe.toFixed(2)}): retornos positivos con riesgo aceptable` })
-    else if (sharpe >= 0) result.push({ type: 'neutral', text: `Sharpe ratio bajo (${sharpe.toFixed(2)}): retornos positivos pero con alto riesgo` })
-    else result.push({ type: 'bearish', text: `Sharpe ratio negativo (${sharpe.toFixed(2)}): perdidas netas, entorno desfavorable` })
+    if (sharpe > 2) result.push({ type: 'bullish', text: `${t('risk.sharpeExcellent')} (${sharpe.toFixed(2)}): ${t('risk.sharpeExcellentDesc')}` })
+    else if (sharpe >= 1) result.push({ type: 'bullish', text: `${t('risk.sharpeGood')} (${sharpe.toFixed(2)}): ${t('risk.sharpeGoodDesc')}` })
+    else if (sharpe >= 0) result.push({ type: 'neutral', text: `${t('risk.sharpeLow')} (${sharpe.toFixed(2)}): ${t('risk.sharpeLowDesc')}` })
+    else result.push({ type: 'bearish', text: `${t('risk.sharpeNeg')} (${sharpe.toFixed(2)}): ${t('risk.sharpeNegDesc')}` })
 
     // VaR
-    result.push({ type: 'neutral', text: `VaR 95%: en un dia malo (5% de probabilidad), la perdida podria ser de ${var95.toFixed(2)}% o mas` })
+    result.push({ type: 'neutral', text: `${t('risk.varExplain')} ${var95.toFixed(2)}% ${t('risk.orMore')}` })
 
     return result
-  }, [riskData])
+  }, [riskData, t])
 
-  if (loading) return <div className="p-6"><PageHeader title="Risk" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
-  if (!riskData) return <div className="p-6"><PageHeader title="Risk" /><EmptyState command="btc-intel analyze risk" /></div>
+  if (loading) return <div className="p-6"><PageHeader title={t('risk.title')} /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
+  if (!riskData) return <div className="p-6"><PageHeader title={t('risk.title')} /><EmptyState command="btc-intel analyze risk" /></div>
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <PageHeader title="Risk Analysis" subtitle="Drawdown, volatility, Sharpe, VaR">
+      <PageHeader title={t('risk.title')} subtitle={t('risk.subtitle')}>
         <HelpButton
-          title="Analisis de Riesgo"
-          content={[
-            "Metricas de riesgo calculadas sobre el precio historico de BTC.",
-            "Current Drawdown: Caida actual desde el ultimo maximo historico. Ejemplo: -15% significa que el precio esta un 15% por debajo de su pico.",
-            "Max Drawdown: La mayor caida desde maximo en el periodo analizado. Indica el peor escenario historico.",
-            "Volatilidad 30D (Anualizada): Cuanto varia el precio en 30 dias, proyectado a un ano. BTC tipicamente tiene 50-80% de volatilidad anual.",
-            "Sharpe Ratio (365D): Mide el retorno ajustado por riesgo. Mayor que 1 = buen rendimiento por unidad de riesgo. Negativo = perdidas.",
-            "VaR 95% (diario): Value at Risk. Con 95% de confianza, la perdida maxima esperada en un dia. Ejemplo: -3.5% significa que solo 1 de cada 20 dias deberia caer mas que eso.",
-          ]}
+          title={t('risk.helpTitle')}
+          content={ta('risk')}
         />
       </PageHeader>
 
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <MetricCard title="Current Drawdown" value={`${riskData.currentDD.toFixed(2)}%`} signal={riskData.currentDD < -20 ? 'extreme_bearish' : riskData.currentDD < -10 ? 'bearish' : undefined} />
-        <MetricCard title="Max Drawdown" value={`${riskData.maxDD.toFixed(2)}%`} />
-        <MetricCard title="Vol 30D (Ann.)" value={`${riskData.vol30.toFixed(1)}%`} />
-        <MetricCard title="Sharpe (365D)" value={riskData.sharpe.toFixed(4)} signal={riskData.sharpe > 1 ? 'bullish' : riskData.sharpe < 0 ? 'bearish' : undefined} />
-        <MetricCard title="VaR 95%" value={`${riskData.var95.toFixed(2)}%`} subtitle="daily" />
+        <MetricCard title={t('risk.currentDrawdown')} value={`${riskData.currentDD.toFixed(2)}%`} signal={riskData.currentDD < -20 ? 'extreme_bearish' : riskData.currentDD < -10 ? 'bearish' : undefined} />
+        <MetricCard title={t('risk.maxDrawdown')} value={`${riskData.maxDD.toFixed(2)}%`} />
+        <MetricCard title={t('risk.vol30d')} value={`${riskData.vol30.toFixed(1)}%`} />
+        <MetricCard title={t('risk.sharpe')} value={riskData.sharpe.toFixed(4)} signal={riskData.sharpe > 1 ? 'bullish' : riskData.sharpe < 0 ? 'bearish' : undefined} />
+        <MetricCard title={t('risk.var95')} value={`${riskData.var95.toFixed(2)}%`} subtitle={t('risk.daily')} />
       </div>
 
-      <ChartContainer title="Drawdown Chart">
+      <ChartContainer title={t('risk.drawdownChart')}>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={riskData.drawdowns}>
@@ -110,7 +105,7 @@ export default function Risk() {
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} />
               <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => `${v}%`} />
-              <Tooltip contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }} formatter={(v) => [`${Number(v).toFixed(2)}%`, 'Drawdown']} />
+              <Tooltip contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }} formatter={(v) => [`${Number(v).toFixed(2)}%`, t('risk.drawdown')]} />
               <Area type="monotone" dataKey="dd" stroke="#ef4444" fill="url(#ddGrad)" strokeWidth={1.5} />
             </AreaChart>
           </ResponsiveContainer>
@@ -119,7 +114,7 @@ export default function Risk() {
 
       {/* Interpretacion */}
       <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
-        <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+        <h3 className="font-display font-semibold mb-3">{t('common.interpretation')}</h3>
         <div className="space-y-2">
           {insights.map((insight, i) => (
             <div key={i} className="flex items-start gap-2">

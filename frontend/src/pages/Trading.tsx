@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ArrowUp, ArrowDown, Minus, Info, Target, ShieldAlert, Bitcoin, BarChart3 } from 'lucide-react'
+import { ArrowUp, ArrowDown, Minus, Info, Target, ShieldAlert, Bitcoin, BarChart3, Layers } from 'lucide-react'
 import { SignalBadge } from '../components/common/MetricCard'
 import { CardSkeleton } from '../components/common/LoadingSkeleton'
 import EmptyState from '../components/common/EmptyState'
@@ -11,8 +11,9 @@ import { useLatestSignals, useLatestIndicators, useTradingRecommendations, SIGNA
 import type { TradingRecommendation, SignalDetail, TradingLevels } from '../hooks/useTechnical'
 import { useLatestSentiment } from '../hooks/useSentiment'
 import { useSignalAccuracy } from '../hooks/useSignalHistory'
+import { usePriceLevels } from '../hooks/useLevels'
 import { useSupabaseQuery, supabase } from '../hooks/useSupabase'
-import type { OnchainMetric } from '../lib/types'
+import type { OnchainMetric, PriceLevel as PriceLevelType } from '../lib/types'
 import { formatPrice, formatPercent, cn } from '../lib/utils'
 import { useI18n } from '../lib/i18n'
 
@@ -440,6 +441,97 @@ function TimeframeDetail({ rec, price, t }: { rec: TradingRecommendation; price:
   )
 }
 
+function classColor(classification: string | null) {
+  switch (classification) {
+    case 'critical': return 'text-red-400'
+    case 'strong': return 'text-yellow-400'
+    case 'moderate': return 'text-green-400'
+    default: return 'text-text-muted'
+  }
+}
+
+function strengthDot(classification: string | null) {
+  switch (classification) {
+    case 'critical': return 'bg-red-400'
+    case 'strong': return 'bg-yellow-400'
+    case 'moderate': return 'bg-green-400'
+    default: return 'bg-text-muted/40'
+  }
+}
+
+function LevelMapSection({ levels, currentPrice, t }: { levels: PriceLevelType[]; currentPrice: number; t: (k: string) => string }) {
+  const above = levels
+    .filter((l) => l.price > currentPrice)
+    .sort((a, b) => a.price - b.price)
+    .slice(0, 6)
+  const below = levels
+    .filter((l) => l.price < currentPrice)
+    .sort((a, b) => b.price - a.price)
+    .slice(0, 6)
+
+  if (above.length === 0 && below.length === 0) return null
+
+  return (
+    <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
+      <h3 className="text-xs font-display font-semibold text-text-secondary mb-3 flex items-center gap-2">
+        <Layers className="w-4 h-4 text-accent-btc" />
+        {t('trading.levelMap')}
+      </h3>
+      <div className="space-y-1">
+        {/* Resistance levels above */}
+        {above.reverse().map((lv) => (
+          <LevelMapRow key={lv.id} level={lv} currentPrice={currentPrice} />
+        ))}
+
+        {/* Current price marker */}
+        <div className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-accent-btc/15 border border-accent-btc/30">
+          <Bitcoin className="w-3.5 h-3.5 text-accent-btc" />
+          <span className="font-mono text-sm font-bold text-accent-btc flex-1">
+            {formatPrice(currentPrice)}
+          </span>
+          <span className="text-[10px] text-accent-btc font-mono">{t('trading.currentPrice')}</span>
+        </div>
+
+        {/* Support levels below */}
+        {below.map((lv) => (
+          <LevelMapRow key={lv.id} level={lv} currentPrice={currentPrice} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function LevelMapRow({ level, currentPrice }: { level: PriceLevelType; currentPrice: number }) {
+  const dist = ((level.price - currentPrice) / currentPrice * 100).toFixed(1)
+  const cls = level.classification
+  const badges: string[] = []
+  if (level.is_role_flip) badges.push('Flip')
+  if (level.is_psychological) badges.push('Psych')
+  if (level.is_high_volume) badges.push('Vol')
+  if (level.fib_level) badges.push(`Fib ${level.fib_level}`)
+
+  return (
+    <div className="flex items-center gap-2 py-1 px-3 rounded-lg hover:bg-bg-tertiary/30">
+      <div className={cn('w-2 h-2 rounded-full flex-shrink-0', strengthDot(cls))} />
+      <span className="font-mono text-xs w-24 text-right">{formatPrice(level.price)}</span>
+      <span className={cn('text-[10px] w-16 text-center font-semibold', classColor(cls))}>
+        {level.strength}/20
+      </span>
+      <span className={cn('text-[10px] w-12', level.type === 'support' ? 'text-bullish' : 'text-bearish')}>
+        {level.type === 'support' ? 'S' : 'R'}
+      </span>
+      <div className="flex gap-1 flex-1 overflow-hidden">
+        {badges.map((b) => (
+          <span key={b} className="text-[9px] bg-bg-tertiary/60 text-text-muted px-1 py-0.5 rounded flex-shrink-0">{b}</span>
+        ))}
+      </div>
+      <span className={cn('text-[10px] font-mono w-12 text-right', Number(dist) > 0 ? 'text-bearish' : 'text-bullish')}>
+        {Number(dist) > 0 ? '+' : ''}{dist}%
+      </span>
+    </div>
+  )
+}
+
 export default function Trading() {
   const { t, ta } = useI18n()
   const { data: prices, loading: priceLoading } = usePriceChanges()
@@ -448,6 +540,7 @@ export default function Trading() {
   const { data: allIndicators } = useLatestIndicators()
   const { data: sentiment } = useLatestSentiment()
   const { stats: signalStats } = useSignalAccuracy()
+  const { data: priceLevels } = usePriceLevels(5)
 
   const { data: onchainRaw } = useSupabaseQuery<OnchainMetric[]>(
     () =>
@@ -512,6 +605,11 @@ export default function Trading() {
           </span>
         )}
       </div>
+
+      {/* Level Map */}
+      {priceLevels && priceLevels.length > 0 && (
+        <LevelMapSection levels={priceLevels} currentPrice={currentPrice} t={t} />
+      )}
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

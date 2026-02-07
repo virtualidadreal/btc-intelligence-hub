@@ -11,7 +11,7 @@ console = Console()
 def analyze_time() -> dict:
     """Calcula rendimiento por mes, día de semana, y trimestre post-halving."""
     db = get_supabase()
-    console.print("[cyan]Analizando estacionalidad...[/cyan]")
+    console.print("[cyan]Analyzing seasonality...[/cyan]")
 
     # Paginated fetch to avoid PostgREST row limit
     all_prices = []
@@ -59,5 +59,5 @@ def analyze_time() -> dict:
         "heatmap": heatmap_dict,
     }
 
-    console.print(f"[green]✅ Time analysis completado[/green]")
+    console.print(f"[green]Time analysis completed[/green]")
     return result

@@ -4,8 +4,10 @@ import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
 import HelpButton from '../components/common/HelpButton'
 import { useCorrelations } from '../hooks/useMacro'
+import { useI18n } from '../lib/i18n'
 
 export default function Macro() {
+  const { t, ta } = useI18n()
   const { data: correlations, loading } = useCorrelations()
 
   const corrMap = useMemo(() => {
@@ -26,6 +28,13 @@ export default function Macro() {
     }))
   }, [corrMap])
 
+  const assetLabelMap: Record<string, string> = {
+    SPX: t('macro.btcSpx'),
+    GOLD: t('macro.btcGold'),
+    DXY: t('macro.btcDxy'),
+    US_10Y: t('macro.btcUs10y'),
+  }
+
   const insights = useMemo(() => {
     const items: { type: 'bullish' | 'bearish' | 'neutral'; text: string }[] = []
     const spx = corrByAsset.find((c) => c.asset === 'SPX')
@@ -34,54 +43,47 @@ export default function Macro() {
 
     if (spx?.corr30 != null) {
       if (spx.corr30 > 0.5) {
-        items.push({ type: 'neutral', text: `Alta correlacion con S&P500 (${spx.corr30.toFixed(2)}): BTC se comporta como activo de riesgo` })
+        items.push({ type: 'neutral', text: `${t('macro.highCorrelationSpx')} (${spx.corr30.toFixed(2)}): ${t('macro.btcRiskAsset')}` })
       } else if (spx.corr30 < 0.2) {
-        items.push({ type: 'bullish', text: 'Baja correlacion con S&P500: BTC actua independiente del mercado tradicional' })
+        items.push({ type: 'bullish', text: t('macro.lowCorrelationSpx') })
       }
     }
     if (dxy?.corr30 != null) {
       if (dxy.corr30 < -0.3) {
-        items.push({ type: 'neutral', text: `Correlacion negativa con dolar (${dxy.corr30.toFixed(2)}): la debilidad del dolar favorece a BTC` })
+        items.push({ type: 'neutral', text: `${t('macro.negCorrelationDxy')} (${dxy.corr30.toFixed(2)}): ${t('macro.weakDollarFavorsBtc')}` })
       } else if (dxy.corr30 > 0.2) {
-        items.push({ type: 'bearish', text: 'Correlacion positiva inusual con dolar: movimiento atipico' })
+        items.push({ type: 'bearish', text: t('macro.posCorrelationDxy') })
       }
     }
     if (gold?.corr30 != null) {
       if (gold.corr30 > 0.5) {
-        items.push({ type: 'bullish', text: 'Alta correlacion con oro: BTC actua como reserva de valor' })
+        items.push({ type: 'bullish', text: t('macro.highCorrelationGold') })
       }
     }
 
     const bullish = items.filter((i) => i.type === 'bullish').length
     const bearish = items.filter((i) => i.type === 'bearish').length
     if (items.length === 0) {
-      items.push({ type: 'neutral', text: 'No hay suficientes datos macro para generar una interpretacion' })
+      items.push({ type: 'neutral', text: t('macro.noData') })
     } else if (bullish > bearish) {
-      items.push({ type: 'bullish', text: 'Entorno macro favorable: BTC muestra independencia y/o actua como reserva de valor' })
+      items.push({ type: 'bullish', text: t('macro.favorable') })
     } else if (bearish > bullish) {
-      items.push({ type: 'bearish', text: 'Entorno macro desfavorable: correlaciones atipicas sugieren cautela' })
+      items.push({ type: 'bearish', text: t('macro.unfavorable') })
     } else {
-      items.push({ type: 'neutral', text: 'Entorno macro mixto: las correlaciones no muestran una tendencia dominante clara' })
+      items.push({ type: 'neutral', text: t('macro.mixed') })
     }
     return items
-  }, [corrByAsset, corrMap])
+  }, [corrByAsset, corrMap, t])
 
   if (loading) return <div className="p-6"><PageHeader title="Macro" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
   if (!correlations?.length) return <div className="p-6"><PageHeader title="Macro" /><EmptyState command="btc-intel analyze macro" /></div>
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <PageHeader title="Macro Analysis" subtitle="BTC correlations with traditional assets">
+      <PageHeader title={t('macro.title')} subtitle={t('macro.subtitle')}>
         <HelpButton
-          title="Analisis Macro"
-          content={[
-            "Correlaciones entre Bitcoin y activos tradicionales calculadas sobre ventanas de 30 y 90 dias.",
-            "SPX (S&P 500): Indice de las 500 mayores empresas de EEUU. Correlacion positiva = BTC se mueve con las acciones. En 2022-2024, BTC ha mostrado alta correlacion con SPX.",
-            "GOLD (Oro): Reserva de valor tradicional. BTC compite con el oro como 'oro digital'. Correlacion positiva indica que ambos actuan como cobertura.",
-            "DXY (Indice Dolar): Mide la fuerza del dolar. Correlacion tipicamente NEGATIVA: cuando el dolar sube, BTC tiende a bajar y viceversa.",
-            "US_10Y (Bono 10 anos): Rendimiento del bono del Tesoro a 10 anos. Tipos altos suelen presionar activos de riesgo como BTC.",
-            "Valores cercanos a +1 o -1 indican correlacion fuerte. Cercanos a 0 = poca relacion. La matriz muestra las correlaciones cruzadas a 30 dias.",
-          ]}
+          title={t('macro.helpTitle')}
+          content={ta('macro')}
         />
       </PageHeader>
 
@@ -89,17 +91,17 @@ export default function Macro() {
         {corrByAsset.map((c) => (
           <MetricCard
             key={c.asset}
-            title={`BTC vs ${c.asset}`}
+            title={assetLabelMap[c.asset] || `BTC vs ${c.asset}`}
             value={c.corr30 != null ? c.corr30.toFixed(3) : 'N/A'}
             subtitle={c.corr90 != null ? `90d: ${c.corr90.toFixed(3)}` : ''}
-            signal={c.corr30 != null ? (Math.abs(c.corr30) > 0.5 ? 'strong' : 'weak') : undefined}
+            signal={c.corr30 != null ? (Math.abs(c.corr30) > 0.5 ? t('macro.strong') : t('macro.weak')) : undefined}
           />
         ))}
       </div>
 
       {/* Correlation Heatmap */}
       <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-        <h3 className="font-display font-semibold mb-4">Correlation Matrix (30D)</h3>
+        <h3 className="font-display font-semibold mb-4">{t('macro.correlationMatrix')}</h3>
         <div className="grid grid-cols-3 md:grid-cols-5 gap-1 text-center text-xs font-mono">
           <div />
           {corrByAsset.map((c) => <div key={c.asset} className="text-text-muted py-1">{c.asset}</div>)}
@@ -125,7 +127,7 @@ export default function Macro() {
 
       {/* Interpretacion */}
       <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
-        <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+        <h3 className="font-display font-semibold mb-3">{t('common.interpretation')}</h3>
         <div className="space-y-2">
           {insights.map((insight, i) => (
             <div key={i} className="flex items-start gap-2">

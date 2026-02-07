@@ -1,4 +1,4 @@
-"""Technical Engine — Calcula indicadores técnicos."""
+"""Technical Engine — Calculates technical indicators."""
 
 from datetime import date
 
@@ -14,9 +14,9 @@ classifier = SignalClassifier()
 
 
 def analyze_technical() -> int:
-    """Calcula todos los indicadores técnicos y los guarda en Supabase."""
+    """Calculate all technical indicators and save to Supabase."""
     db = get_supabase()
-    console.print("[cyan]Calculando indicadores técnicos...[/cyan]")
+    console.print("[cyan]Calculating technical indicators...[/cyan]")
 
     # Cargar precios (paginated to avoid PostgREST row limit)
     all_prices = []
@@ -32,10 +32,10 @@ def analyze_technical() -> int:
         offset += page_size
 
     if not all_prices:
-        console.print("[yellow]Sin datos de precios[/yellow]")
+        console.print("[yellow]No price data[/yellow]")
         return 0
 
-    console.print(f"[cyan]Cargados {len(all_prices)} precios[/cyan]")
+    console.print(f"[cyan]Loaded {len(all_prices)} prices[/cyan]")
     df = pd.DataFrame(all_prices)
     df["close"] = df["close"].astype(float)
     df["high"] = df["high"].astype(float)
@@ -172,7 +172,7 @@ def analyze_technical() -> int:
                 })
 
     if not rows:
-        console.print("[yellow]Sin indicadores calculados[/yellow]")
+        console.print("[yellow]No indicators calculated[/yellow]")
         return 0
 
     # Upsert en batches
@@ -186,5 +186,5 @@ def analyze_technical() -> int:
         except Exception as e:
             console.print(f"[red]Error batch {i}: {e}[/red]")
 
-    console.print(f"[green]✅ Technical: {inserted} indicadores guardados[/green]")
+    console.print(f"[green]Technical: {inserted} indicators saved[/green]")
     return inserted

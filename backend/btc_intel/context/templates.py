@@ -1,30 +1,30 @@
-"""Templates — Plantillas de texto para contextos."""
+"""Templates — Text templates for contexts."""
 
-SUMMARY_TEMPLATE = """# BTC Intelligence Hub — Resumen
-Fecha: {date}
+SUMMARY_TEMPLATE = """# BTC Intelligence Hub — Summary
+Date: {date}
 
-## Precio BTC
-- Actual: **${price:,.2f}**
-- Cambio 24h: {change_24h} | 7d: {change_7d} | 30d: {change_30d}
+## BTC Price
+- Current: **${price:,.2f}**
+- Change 24h: {change_24h} | 7d: {change_7d} | 30d: {change_30d}
 
 ## Cycle Score
-- Score: **{cycle_score}/100** — Fase: **{phase}**
+- Score: **{cycle_score}/100** — Phase: **{phase}**
 
-## Señales
+## Signals
 {signals}
 
-## Confluencias
+## Confluences
 {confluences}
 
-## Alertas
+## Alerts
 {alerts}
 
-## Conclusiones Recientes
+## Recent Conclusions
 {conclusions}
 """
 
 MORNING_TEMPLATE = """# BTC Intelligence Hub — Morning Briefing
-Fecha: {date}
+Date: {date}
 
 {price_section}
 {cycle_score_section}
@@ -38,7 +38,7 @@ Fecha: {date}
 """
 
 DEEP_TEMPLATE = """# BTC Intelligence Hub — Deep Analysis: {area}
-Fecha: {date}
+Date: {date}
 
 {price_section}
 {area_section}
@@ -47,8 +47,8 @@ Fecha: {date}
 {conclusions_section}
 """
 
-COMPARE_TEMPLATE = """# BTC Intelligence Hub — Comparativa
-Período 1: {period1} | Período 2: {period2}
+COMPARE_TEMPLATE = """# BTC Intelligence Hub — Comparison
+Period 1: {period1} | Period 2: {period2}
 
 {compare_section}
 """

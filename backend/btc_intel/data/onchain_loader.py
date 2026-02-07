@@ -1,4 +1,4 @@
-"""On-Chain Data Loader — Métricas on-chain desde Blockchain.com API."""
+"""On-Chain Data Loader — On-chain metrics from Blockchain.com API."""
 
 from datetime import date, datetime, timedelta
 

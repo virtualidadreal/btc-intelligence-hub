@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
-import { LineChart, Line, AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ComposedChart, Bar, ReferenceLine, ReferenceDot } from 'recharts'
+import { Line, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ComposedChart, Bar, ReferenceLine, ReferenceDot } from 'recharts'
 import { SignalBadge } from '../components/common/MetricCard'
 import { CardSkeleton } from '../components/common/LoadingSkeleton'
 import EmptyState from '../components/common/EmptyState'
@@ -9,6 +9,7 @@ import ChartContainer from '../components/common/ChartContainer'
 import { useIndicatorHistory, useLatestSignals } from '../hooks/useTechnical'
 import { usePriceHistory } from '../hooks/usePrices'
 import { formatPrice } from '../lib/utils'
+import { useI18n } from '../lib/i18n'
 
 const RANGE_DAYS: Record<string, number> = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, ALL: 9999 }
 
@@ -18,7 +19,14 @@ function sliceByRange<T>(data: T[], range: string): T[] {
   return data.slice(-days)
 }
 
+function fmtDate(iso: string): string {
+  if (!iso || !iso.includes('-')) return iso || ''
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
 export default function Technical() {
+  const { t, ta } = useI18n()
   const [range, setRange] = useState('1Y')
   const { data: rsiData, loading } = useIndicatorHistory('RSI_14', 3000)
   const { data: macdData } = useIndicatorHistory('MACD', 3000)
@@ -26,13 +34,29 @@ export default function Technical() {
   const { data: macdHistData } = useIndicatorHistory('MACD_HIST', 3000)
   const { data: signals } = useLatestSignals()
   const { data: prices } = usePriceHistory(3000)
+  const { data: ema21Data } = useIndicatorHistory('EMA_21', 3000)
+  const { data: sma50Data } = useIndicatorHistory('SMA_50', 3000)
+  const { data: sma200Data } = useIndicatorHistory('SMA_200', 3000)
 
   const handleRange = useCallback((r: string) => setRange(r), [])
+
+  const formatAxisDate = useCallback((iso: string) => {
+    if (!iso || !iso.includes('-')) return iso || ''
+    const [y, m, d] = iso.split('-')
+    if (range === '1M' || range === '3M') return `${d}/${m}`
+    return `${m}/${y.slice(2)}`
+  }, [range])
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const formatTooltipLabel = useCallback((label: any) => {
+    if (!label) return ''
+    return fmtDate(String(label))
+  }, [])
 
   // Build full datasets (reversed = chronological)
   const fullRsi = useMemo(() => {
     if (!rsiData) return []
-    return [...rsiData].reverse().map((d) => ({ date: d.date.slice(5), fullDate: d.date, value: d.value, signal: d.signal }))
+    return [...rsiData].reverse().map((d) => ({ date: d.date, value: d.value, signal: d.signal }))
   }, [rsiData])
 
   const fullMacd = useMemo(() => {
@@ -40,8 +64,7 @@ export default function Technical() {
     const signalMap = new Map(macdSignalData?.map((d) => [d.date, d.value]) || [])
     const histMap = new Map(macdHistData?.map((d) => [d.date, d.value]) || [])
     return [...macdData].reverse().map((d) => ({
-      date: d.date.slice(5),
-      fullDate: d.date,
+      date: d.date,
       macd: d.value,
       signal_line: signalMap.get(d.date) ?? null,
       histogram: histMap.get(d.date) ?? null,
@@ -51,8 +74,17 @@ export default function Technical() {
 
   const fullPrice = useMemo(() => {
     if (!prices) return []
-    return [...prices].reverse().map((p) => ({ date: p.date.slice(5), fullDate: p.date, price: p.close }))
-  }, [prices])
+    const ema21Map = new Map(ema21Data?.map((d) => [d.date, d.value]) || [])
+    const sma50Map = new Map(sma50Data?.map((d) => [d.date, d.value]) || [])
+    const sma200Map = new Map(sma200Data?.map((d) => [d.date, d.value]) || [])
+    return [...prices].reverse().map((p) => ({
+      date: p.date,
+      price: p.close,
+      ema21: ema21Map.get(p.date) ?? null,
+      sma50: sma50Map.get(p.date) ?? null,
+      sma200: sma200Map.get(p.date) ?? null,
+    }))
+  }, [prices, ema21Data, sma50Data, sma200Data])
 
   // Apply time range filter
   const rsiChart = useMemo(() => sliceByRange(fullRsi, range), [fullRsi, range])
@@ -81,51 +113,66 @@ export default function Technical() {
     if (!rsiChart.length) return result
     const latestRsi = rsiChart[rsiChart.length - 1]
     if (latestRsi) {
-      if (latestRsi.value > 70) result.push({ type: 'bearish', text: `RSI en sobrecompra (${latestRsi.value.toFixed(1)}): posible correccion a corto plazo` })
-      else if (latestRsi.value < 30) result.push({ type: 'bullish', text: `RSI en sobreventa (${latestRsi.value.toFixed(1)}): posible rebote a corto plazo` })
-      else if (latestRsi.value > 50) result.push({ type: 'bullish', text: `RSI en zona alcista (${latestRsi.value.toFixed(1)}): momentum positivo` })
-      else result.push({ type: 'bearish', text: `RSI en zona bajista (${latestRsi.value.toFixed(1)}): momentum debil` })
+      if (latestRsi.value > 70) result.push({ type: 'bearish', text: `RSI en sobrecompra (${latestRsi.value.toFixed(1)}): ${t('technical.rsiOverbought')}` })
+      else if (latestRsi.value < 30) result.push({ type: 'bullish', text: `RSI en sobreventa (${latestRsi.value.toFixed(1)}): ${t('technical.rsiOversold')}` })
+      else if (latestRsi.value > 50) result.push({ type: 'bullish', text: `RSI en zona alcista (${latestRsi.value.toFixed(1)}): ${t('technical.rsiBullZone')}` })
+      else result.push({ type: 'bearish', text: `RSI en zona bajista (${latestRsi.value.toFixed(1)}): ${t('technical.rsiBearZone')}` })
     }
     if (macdChart.length) {
       const latestMacd = macdChart[macdChart.length - 1]
       if (latestMacd.histogram != null) {
-        if (latestMacd.histogram > 0) result.push({ type: 'bullish', text: `MACD histograma positivo (${latestMacd.histogram.toFixed(2)}): momentum alcista` })
-        else result.push({ type: 'bearish', text: `MACD histograma negativo (${latestMacd.histogram.toFixed(2)}): momentum bajista` })
+        if (latestMacd.histogram > 0) result.push({ type: 'bullish', text: `MACD histograma positivo (${latestMacd.histogram.toFixed(2)}): ${t('technical.macdPosBullish')}` })
+        else result.push({ type: 'bearish', text: `MACD histograma negativo (${latestMacd.histogram.toFixed(2)}): ${t('technical.macdNegBearish')}` })
       }
       if (crosses.length) {
         const lastCross = crosses[crosses.length - 1]
         result.push({
           type: lastCross.type,
-          text: `Ultimo cruce MACD: ${lastCross.type === 'bullish' ? 'alcista (MACD cruza por encima de signal)' : 'bajista (MACD cruza por debajo de signal)'} en ${lastCross.date}`,
+          text: `${t('technical.lastMacdCross')} ${lastCross.type === 'bullish' ? t('technical.bullishMacdCross') : t('technical.bearishMacdCross')} en ${fmtDate(lastCross.date)}`,
         })
+      }
+    }
+    // MA proximity insights
+    if (priceChart.length) {
+      const latest = priceChart[priceChart.length - 1]
+      if (latest.ema21 && latest.price) {
+        const pctFromEma = ((latest.price - latest.ema21) / latest.ema21) * 100
+        if (Math.abs(pctFromEma) < 2) {
+          result.push({ type: 'neutral', text: `Precio cerca de EMA 21 (${formatPrice(latest.ema21)}): ${t('technical.priceNearEma')}` })
+        } else if (pctFromEma > 0) {
+          result.push({ type: 'bullish', text: `Precio ${pctFromEma.toFixed(1)}% ${t('technical.priceAboveEma')} (${formatPrice(latest.ema21)})` })
+        } else {
+          result.push({ type: 'bearish', text: `Precio ${Math.abs(pctFromEma).toFixed(1)}% ${t('technical.priceBelowEma')} (${formatPrice(latest.ema21)})` })
+        }
+      }
+      if (latest.sma50 && latest.sma200) {
+        if (latest.sma50 > latest.sma200) {
+          result.push({ type: 'bullish', text: `SMA 50 (${formatPrice(latest.sma50)}) ${t('technical.smaAbove')} (${formatPrice(latest.sma200)}): ${t('technical.structureBullish')}` })
+        } else {
+          result.push({ type: 'bearish', text: `SMA 50 (${formatPrice(latest.sma50)}) ${t('technical.smaBelow')} (${formatPrice(latest.sma200)}): ${t('technical.structureBearish')}` })
+        }
       }
     }
     const smaSignal = signals?.find((s) => s.indicator === 'SMA_CROSS')
     if (smaSignal) {
       result.push({
         type: smaSignal.signal === 'bullish' ? 'bullish' : smaSignal.signal === 'bearish' ? 'bearish' : 'neutral',
-        text: smaSignal.signal === 'bullish' ? 'Golden Cross activo (SMA50 > SMA200): tendencia alcista de largo plazo' : smaSignal.signal === 'bearish' ? 'Death Cross activo (SMA50 < SMA200): tendencia bajista de largo plazo' : 'SMAs convergiendo: posible cambio de tendencia',
+        text: smaSignal.signal === 'bullish' ? t('technical.goldenCross') : smaSignal.signal === 'bearish' ? t('technical.deathCross') : t('technical.smaConverging'),
       })
     }
     return result
-  }, [rsiChart, macdChart, crosses, signals])
+  }, [rsiChart, macdChart, crosses, signals, priceChart, t])
 
-  if (loading) return <div className="p-6"><PageHeader title="Technical" /><div className="grid grid-cols-2 gap-4">{Array.from({length:4}).map((_,i)=><CardSkeleton key={i}/>)}</div></div>
+  if (loading) return <div className="p-6"><PageHeader title={t('technical.title')} /><div className="grid grid-cols-2 gap-4">{Array.from({length:4}).map((_,i)=><CardSkeleton key={i}/>)}</div></div>
 
-  if (!rsiData?.length) return <div className="p-6"><PageHeader title="Technical" /><EmptyState command="btc-intel analyze technical" /></div>
+  if (!rsiData?.length) return <div className="p-6"><PageHeader title={t('technical.title')} /><EmptyState command="btc-intel analyze technical" /></div>
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <PageHeader title="Technical Analysis" subtitle="Indicadores tecnicos y signals">
+      <PageHeader title={t('technical.title')} subtitle={t('technical.subtitle')}>
         <HelpButton
-          title="Analisis Tecnico"
-          content={[
-            "Indicadores tecnicos calculados sobre el precio historico de BTC.",
-            "RSI (14): Relative Strength Index. Por encima de 70 = sobrecompra, por debajo de 30 = sobreventa.",
-            "MACD: Linea MACD (naranja), Signal (azul), Histograma (barras). Los circulos marcan los cruces: verde=alcista, rojo=bajista.",
-            "SMA Cross: Cruce de medias moviles SMA 50 y SMA 200. Golden Cross = senal alcista, Death Cross = bajista.",
-            "Usa los botones 1M/3M/6M/1Y/ALL para cambiar el rango temporal de todos los graficos.",
-          ]}
+          title={t('technical.helpTitle')}
+          content={ta('technical')}
         />
       </PageHeader>
 
@@ -142,11 +189,11 @@ export default function Technical() {
         </div>
       )}
 
-      {/* Price Chart */}
-      <ChartContainer title="BTC Price" activeRange={range} onTimeRangeChange={handleRange}>
-        <div className="h-64">
+      {/* Price Chart with Moving Averages */}
+      <ChartContainer title={t('technical.priceMA')} activeRange={range} onTimeRangeChange={handleRange}>
+        <div className="h-72">
           <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={priceChart}>
+            <ComposedChart data={priceChart}>
               <defs>
                 <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="5%" stopColor="#f7931a" stopOpacity={0.3} />
@@ -154,42 +201,61 @@ export default function Technical() {
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} />
-              <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-              <Tooltip contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }} labelStyle={{ color: '#9ca3af' }} formatter={(v) => [formatPrice(Number(v)), 'BTC']} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={formatAxisDate} />
+              <YAxis domain={[(min: number) => min * 0.98, (max: number) => max * 1.02]} tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
+              <Tooltip
+                contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }}
+                labelFormatter={formatTooltipLabel}
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                formatter={(v: any, name: any) => {
+                  if (v == null) return ['—', name]
+                  const label = name === 'price' ? 'BTC' : name === 'ema21' ? 'EMA 21' : name === 'sma50' ? 'SMA 50' : name === 'sma200' ? 'SMA 200' : name
+                  return [formatPrice(Number(v)), label]
+                }}
+              />
               <Area type="monotone" dataKey="price" stroke="#f7931a" fill="url(#priceGrad)" strokeWidth={2} />
-            </AreaChart>
+              <Line type="monotone" dataKey="ema21" stroke="#06b6d4" strokeWidth={1.5} dot={false} connectNulls />
+              <Line type="monotone" dataKey="sma50" stroke="#a855f7" strokeWidth={1.5} dot={false} connectNulls />
+              <Line type="monotone" dataKey="sma200" stroke="#ef4444" strokeWidth={1.5} dot={false} connectNulls />
+            </ComposedChart>
           </ResponsiveContainer>
+        </div>
+        <div className="flex flex-wrap gap-4 mt-2 text-xs text-text-muted">
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#f7931a] inline-block" /> {t('overview.btcPrice')}</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#06b6d4] inline-block" /> EMA 21</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#a855f7] inline-block" /> SMA 50</span>
+          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#ef4444] inline-block" /> SMA 200</span>
         </div>
       </ChartContainer>
 
       {/* RSI Chart */}
-      <ChartContainer title="RSI (14)" activeRange={range} onTimeRangeChange={handleRange}>
+      <ChartContainer title={t('technical.rsi')} activeRange={range} onTimeRangeChange={handleRange}>
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={rsiChart}>
+            <ComposedChart data={rsiChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={formatAxisDate} />
               <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#6b7280' }} />
-              <Tooltip contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }} />
+              <Tooltip contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }} labelFormatter={formatTooltipLabel} />
               <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: '70', position: 'right', fill: '#ef4444', fontSize: 10 }} />
               <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" label={{ value: '30', position: 'right', fill: '#22c55e', fontSize: 10 }} />
               <Line type="monotone" dataKey="value" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-            </LineChart>
+            </ComposedChart>
           </ResponsiveContainer>
         </div>
       </ChartContainer>
 
       {/* MACD Chart */}
-      <ChartContainer title="MACD (12, 26, 9)" activeRange={range} onTimeRangeChange={handleRange}>
+      <ChartContainer title={t('technical.macd')} activeRange={range} onTimeRangeChange={handleRange}>
         <div className="h-56">
           <ResponsiveContainer width="100%" height="100%">
             <ComposedChart data={macdChart}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={formatAxisDate} />
               <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} />
               <Tooltip
                 contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }}
+                labelFormatter={formatTooltipLabel}
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 formatter={(v: any, name: any) => [v != null ? Number(v).toFixed(2) : '—', name === 'macd' ? 'MACD' : name === 'signal_line' ? 'Signal' : 'Histogram']}
               />
@@ -213,15 +279,15 @@ export default function Technical() {
         <div className="flex gap-4 mt-2 text-xs text-text-muted">
           <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#f7931a] inline-block" /> MACD</span>
           <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#3b82f6] inline-block border-dashed" /> Signal</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-bullish inline-block" /> Cruce alcista</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-bearish inline-block" /> Cruce bajista</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-bullish inline-block" /> {t('technical.bullishCross')}</span>
+          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-bearish inline-block" /> {t('technical.bearishCross')}</span>
         </div>
       </ChartContainer>
 
       {/* Interpretation */}
       {insights.length > 0 && (
         <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
-          <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+          <h3 className="font-display font-semibold mb-3">{t('common.interpretation')}</h3>
           <div className="space-y-2">
             {insights.map((insight, i) => (
               <div key={i} className="flex items-start gap-2">

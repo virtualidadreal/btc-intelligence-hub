@@ -132,7 +132,7 @@ def calculate_cycle_score() -> dict | None:
     }
 
     if not components:
-        console.print("[yellow]Sin datos suficientes para Cycle Score[/yellow]")
+        console.print("[yellow]Insufficient data for Cycle Score[/yellow]")
         return None
 
     score = 0
@@ -185,6 +185,6 @@ def calculate_cycle_score() -> dict | None:
 
     console.print(f"  [bold]Cycle Score: {score}/100 — {phase.upper()}[/bold]")
     console.print(f"  Componentes: {components}")
-    console.print(f"[green]✅ Cycle Score guardado[/green]")
+    console.print(f"[green]Cycle Score saved[/green]")
 
     return {"score": score, "phase": phase, "components": components}

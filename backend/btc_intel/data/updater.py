@@ -1,4 +1,4 @@
-"""Updater coordinado — Actualiza todos los datos de forma incremental."""
+"""Coordinated Updater — Updates all data incrementally."""
 
 import asyncio
 
@@ -14,42 +14,42 @@ console = Console()
 
 
 async def update_all() -> dict:
-    """Actualiza todos los datos de forma incremental."""
-    console.print("[bold cyan]═══ Actualizando TODOS los datos ═══[/bold cyan]\n")
+    """Update all data incrementally."""
+    console.print("[bold cyan]═══ Updating ALL data ═══[/bold cyan]\n")
     results = {}
 
     # BTC prices
-    console.print("[bold]📊 BTC Prices[/bold]")
+    console.print("[bold]BTC Prices[/bold]")
     results["btc"] = await load_btc_prices()
     console.print()
 
     # Macro data
-    console.print("[bold]🌍 Macro Data[/bold]")
+    console.print("[bold]Macro Data[/bold]")
     results["macro"] = await load_macro_data()
     console.print()
 
     # On-chain
-    console.print("[bold]📡 On-Chain Data[/bold]")
+    console.print("[bold]On-Chain Data[/bold]")
     results["onchain"] = await load_onchain_data()
     console.print()
 
     # Sentiment
-    console.print("[bold]💭 Sentiment Data[/bold]")
+    console.print("[bold]Sentiment Data[/bold]")
     results["sentiment"] = await load_sentiment_data()
     console.print()
 
     # Derivatives (Funding Rate, Open Interest)
-    console.print("[bold]📈 Derivatives Data[/bold]")
+    console.print("[bold]Derivatives Data[/bold]")
     results["derivatives"] = await load_derivatives_data()
     console.print()
 
     total = sum(results.values())
-    console.print(f"[bold green]═══ Total: {total} filas actualizadas ═══[/bold green]")
+    console.print(f"[bold green]═══ Total: {total} rows updated ═══[/bold green]")
     return results
 
 
 async def update_only(category: str) -> int:
-    """Actualiza solo una categoría."""
+    """Update a single category."""
     loaders = {
         "btc": load_btc_prices,
         "macro": load_macro_data,
@@ -59,8 +59,8 @@ async def update_only(category: str) -> int:
     }
 
     if category not in loaders:
-        console.print(f"[red]Categoría desconocida: {category}[/red]")
-        console.print(f"[dim]Opciones: {', '.join(loaders.keys())}[/dim]")
+        console.print(f"[red]Unknown category: {category}[/red]")
+        console.print(f"[dim]Options: {', '.join(loaders.keys())}[/dim]")
         return 0
 
     return await loaders[category]()

@@ -1,4 +1,4 @@
-"""Configuración del sistema — carga variables de entorno."""
+"""System configuration — load environment variables."""
 
 from pathlib import Path
 

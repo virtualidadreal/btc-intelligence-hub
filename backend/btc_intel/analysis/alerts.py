@@ -1,4 +1,4 @@
-"""Alerts Engine — Motor de alertas automáticas."""
+"""Alerts Engine — Automatic alerts engine."""
 
 from rich.console import Console
 from rich.table import Table
@@ -9,9 +9,9 @@ console = Console()
 
 
 def check_alerts() -> int:
-    """Ejecuta reglas de alertas y crea las que apliquen."""
+    """Run alert rules and create applicable ones."""
     db = get_supabase()
-    console.print("[cyan]Comprobando reglas de alertas...[/cyan]")
+    console.print("[cyan]Checking alert rules...[/cyan]")
 
     from btc_intel.analysis.patterns import detect_patterns
     alerts_created = detect_patterns()
@@ -28,23 +28,23 @@ def check_alerts() -> int:
         score = cs.data[0]["score"]
         if score > 85:
             _create_alert(db, "cycle", "critical",
-                         f"Cycle Score >85 — Zona de euforia ({score})",
-                         f"Score actual: {score}. Fase: {cs.data[0]['phase']}",
+                         f"Cycle Score >85 — Euphoria zone ({score})",
+                         f"Current score: {score}. Phase: {cs.data[0]['phase']}",
                          "CYCLE_SCORE", score, 85, "bearish")
             alerts_created += 1
         elif score < 15:
             _create_alert(db, "cycle", "critical",
-                         f"Cycle Score <15 — Zona de capitulación ({score})",
-                         f"Score actual: {score}. Fase: {cs.data[0]['phase']}",
+                         f"Cycle Score <15 — Capitulation zone ({score})",
+                         f"Current score: {score}. Phase: {cs.data[0]['phase']}",
                          "CYCLE_SCORE", score, 15, "bullish")
             alerts_created += 1
 
-    console.print(f"[green]✅ Alertas: {alerts_created} nuevas[/green]")
+    console.print(f"[green]Alerts: {alerts_created} new[/green]")
     return alerts_created
 
 
 def list_alerts(severity: str | None = None) -> list:
-    """Lista alertas activas."""
+    """List active alerts."""
     db = get_supabase()
 
     query = db.table("alerts").select("*").eq("acknowledged", False).order("date", desc=True)
@@ -54,29 +54,28 @@ def list_alerts(severity: str | None = None) -> list:
     result = query.limit(50).execute()
 
     if not result.data:
-        console.print("[dim]No hay alertas activas[/dim]")
+        console.print("[dim]No active alerts[/dim]")
         return []
 
-    table = Table(title="Alertas Activas", border_style="bright_blue")
+    table = Table(title="Active Alerts", border_style="bright_blue")
     table.add_column("ID", style="dim")
     table.add_column("Sev", style="bold")
-    table.add_column("Tipo")
-    table.add_column("Título")
-    table.add_column("Señal")
-    table.add_column("Fecha", style="dim")
+    table.add_column("Type")
+    table.add_column("Title")
+    table.add_column("Signal")
+    table.add_column("Date", style="dim")
 
     sev_colors = {"critical": "red", "warning": "yellow", "info": "blue"}
 
     for alert in result.data:
-        sev = alert["severity"]
-        color = sev_colors.get(sev, "white")
+        color = sev_colors.get(alert["severity"], "white")
         table.add_row(
             str(alert["id"]),
-            f"[{color}]{sev.upper()}[/{color}]",
-            alert["type"],
-            alert["title"],
+            f"[{color}]{alert['severity'].upper()}[/{color}]",
+            alert.get("type", ""),
+            alert.get("title", "")[:50],
             alert.get("signal", "—"),
-            str(alert["date"])[:10],
+            str(alert.get("date", ""))[:10],
         )
 
     console.print(table)
@@ -84,27 +83,30 @@ def list_alerts(severity: str | None = None) -> list:
 
 
 def ack_alert(alert_id: int):
-    """Marca una alerta como vista."""
+    """Acknowledge an alert."""
     db = get_supabase()
     db.table("alerts").update({"acknowledged": True}).eq("id", alert_id).execute()
-    console.print(f"[green]Alerta #{alert_id} marcada como vista[/green]")
+    console.print(f"[green]Alert #{alert_id} acknowledged[/green]")
 
 
-def _create_alert(db, type_: str, severity: str, title: str, description: str,
-                  metric: str, current_value: float, threshold_value: float, signal: str):
-    """Crea alerta si no existe una similar."""
+def _create_alert(db, type_: str, severity: str, title: str,
+                  description: str, metric: str, current_value: float,
+                  threshold_value: float, signal: str):
+    """Create an alert if it doesn't already exist today."""
+    from datetime import date
     existing = (
         db.table("alerts")
         .select("id")
+        .eq("type", type_)
         .eq("title", title)
-        .eq("acknowledged", False)
-        .limit(1)
+        .gte("date", str(date.today()))
         .execute()
     )
     if existing.data:
         return
 
     db.table("alerts").insert({
+        "date": str(date.today()),
         "type": type_,
         "severity": severity,
         "title": title,
@@ -113,4 +115,5 @@ def _create_alert(db, type_: str, severity: str, title: str, description: str,
         "current_value": current_value,
         "threshold_value": threshold_value,
         "signal": signal,
+        "acknowledged": False,
     }).execute()

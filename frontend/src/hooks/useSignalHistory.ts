@@ -1,17 +1,7 @@
 import { supabase, useSupabaseQuery } from './useSupabase'
+import type { SignalHistory } from '../lib/types'
 
-export interface SignalHistory {
-  id: number
-  date: string
-  timeframe: string
-  direction: string
-  confidence: number
-  score: number
-  price_at_signal: number
-  price_1h_later: number | null
-  outcome_1h: string | null
-  created_at: string
-}
+export type { SignalHistory }
 
 export function useSignalHistory(limit = 100) {
   return useSupabaseQuery<SignalHistory[]>(
@@ -31,21 +21,34 @@ export function useSignalAccuracy() {
 
   const stats = data
     ? (() => {
-        const byTf: Record<string, { correct: number; incorrect: number; total: number }> = {}
+        const byTf: Record<string, { correct: number; incorrect: number; tp2: number; total: number }> = {}
 
         for (const s of data) {
-          if (!s.outcome_1h) continue
+          // Use v2 outcome field first, fall back to legacy outcome_1h
+          const outcome = s.outcome ?? s.outcome_1h
+          if (!outcome || outcome === 'pending') continue
+
           if (!byTf[s.timeframe]) {
-            byTf[s.timeframe] = { correct: 0, incorrect: 0, total: 0 }
+            byTf[s.timeframe] = { correct: 0, incorrect: 0, tp2: 0, total: 0 }
           }
           byTf[s.timeframe].total++
-          if (s.outcome_1h === 'correct') byTf[s.timeframe].correct++
-          else byTf[s.timeframe].incorrect++
+
+          if (outcome === 'tp1_hit' || outcome === 'tp2_hit' || outcome === 'correct') {
+            byTf[s.timeframe].correct++
+            if (outcome === 'tp2_hit') byTf[s.timeframe].tp2++
+          } else {
+            byTf[s.timeframe].incorrect++
+          }
         }
 
         const overall = Object.values(byTf).reduce(
-          (acc, v) => ({ correct: acc.correct + v.correct, incorrect: acc.incorrect + v.incorrect, total: acc.total + v.total }),
-          { correct: 0, incorrect: 0, total: 0 },
+          (acc, v) => ({
+            correct: acc.correct + v.correct,
+            incorrect: acc.incorrect + v.incorrect,
+            tp2: acc.tp2 + v.tp2,
+            total: acc.total + v.total,
+          }),
+          { correct: 0, incorrect: 0, tp2: 0, total: 0 },
         )
 
         return {

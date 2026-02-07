@@ -11,9 +11,9 @@ classifier = SignalClassifier()
 
 
 def analyze_sentiment() -> int:
-    """Calcula medias móviles y clasifica sentimiento."""
+    """Calculate moving averages and classify sentiment."""
     db = get_supabase()
-    console.print("[cyan]Analizando sentimiento...[/cyan]")
+    console.print("[cyan]Analyzing sentiment...[/cyan]")
 
     total = 0
 
@@ -53,5 +53,5 @@ def analyze_sentiment() -> int:
                 total += len(rows[i:i+500])
             console.print(f"  [green]FEAR_GREED_30D: {len(rows)} filas[/green]")
 
-    console.print(f"[green]✅ Sentiment analysis: {total} señales[/green]")
+    console.print(f"[green]✅ Sentiment analysis: {total} signals[/green]")
     return total

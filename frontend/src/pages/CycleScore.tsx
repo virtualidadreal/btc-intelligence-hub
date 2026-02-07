@@ -8,16 +8,7 @@ import HelpButton from '../components/common/HelpButton'
 import ChartContainer from '../components/common/ChartContainer'
 import { useLatestCycleScore, useCycleScoreHistory } from '../hooks/useCycleScore'
 import { formatDate } from '../lib/utils'
-
-const PHASE_LABELS: Record<string, string> = {
-  capitulation: 'CAPITULACION',
-  accumulation: 'ACUMULACION',
-  early_bull: 'BULL TEMPRANO',
-  mid_bull: 'BULL MEDIO',
-  late_bull: 'BULL TARDIO',
-  distribution: 'DISTRIBUCION',
-  euphoria: 'EUFORIA',
-}
+import { useI18n } from '../lib/i18n'
 
 const PHASE_COLORS: Record<string, string> = {
   capitulation: '#ef4444',
@@ -30,6 +21,7 @@ const PHASE_COLORS: Record<string, string> = {
 }
 
 export default function CycleScore() {
+  const { t, ta } = useI18n()
   const { data: latest, loading } = useLatestCycleScore()
   const { data: history } = useCycleScoreHistory(90)
 
@@ -38,20 +30,22 @@ export default function CycleScore() {
   const components = useMemo(() => {
     if (!cs) return []
     return [
-      { name: 'SMA Position', value: cs.mvrv_component, max: 100 },
-      { name: 'Price Position', value: cs.nupl_component, max: 100 },
-      { name: 'Halving', value: cs.halving_component, max: 100 },
-      { name: 'RSI Monthly', value: cs.rsi_monthly_component, max: 100 },
-      { name: 'Hash Rate Mom', value: cs.exchange_flow_component, max: 100 },
-      { name: 'Fear & Greed', value: cs.fear_greed_component, max: 100 },
-      { name: 'F&G 30D', value: cs.google_trends_component, max: 100 },
+      { name: t('cycleScore.smaPosition'), value: cs.mvrv_component, max: 100 },
+      { name: t('cycleScore.pricePosition'), value: cs.nupl_component, max: 100 },
+      { name: t('cycleScore.halving'), value: cs.halving_component, max: 100 },
+      { name: t('cycleScore.rsiMonthly'), value: cs.rsi_monthly_component, max: 100 },
+      { name: t('cycleScore.hashRateMom'), value: cs.exchange_flow_component, max: 100 },
+      { name: t('cycleScore.fearGreed'), value: cs.fear_greed_component, max: 100 },
+      { name: t('cycleScore.fg30d'), value: cs.google_trends_component, max: 100 },
     ].filter((c) => c.value != null)
-  }, [cs])
+  }, [cs, t])
 
   const historyChart = useMemo(() => {
     if (!history) return []
     return [...history].reverse().map((h) => ({ date: h.date.slice(5), score: h.score, phase: h.phase }))
   }, [history])
+
+  const phaseLabel = (phase: string) => t(`phase.${phase}`) || phase
 
   const insights = useMemo(() => {
     if (!cs) return []
@@ -59,20 +53,20 @@ export default function CycleScore() {
     const score = cs.score
 
     // Score level
-    if (score <= 14) result.push({ type: 'bullish', text: `Score en zona de capitulacion (${score}): historicamente la mejor zona de acumulacion a largo plazo` })
-    else if (score <= 29) result.push({ type: 'bullish', text: `Zona de acumulacion (${score}): riesgo bajo, buen momento para posiciones a largo plazo` })
-    else if (score <= 44) result.push({ type: 'neutral', text: `Bull temprano (${score}): el ciclo alcista esta comenzando, tendencia favorable` })
-    else if (score <= 59) result.push({ type: 'neutral', text: `Bull medio (${score}): ciclo madurando, mantener posiciones pero vigilar cambios` })
-    else if (score <= 74) result.push({ type: 'bearish', text: `Bull tardio (${score}): riesgo creciente, considerar reducir exposicion gradualmente` })
-    else if (score <= 84) result.push({ type: 'bearish', text: `Zona de distribucion (${score}): alto riesgo, smart money probablemente vendiendo` })
-    else result.push({ type: 'bearish', text: `Zona de euforia (${score}): riesgo extremo, el mercado esta sobrecalentado` })
+    if (score <= 14) result.push({ type: 'bullish', text: `${t('cycleScore.capitulation')} (${score}): ${t('cycleScore.capitulationDesc')}` })
+    else if (score <= 29) result.push({ type: 'bullish', text: `${t('cycleScore.accumulation')} (${score}): ${t('cycleScore.accumulationDesc')}` })
+    else if (score <= 44) result.push({ type: 'neutral', text: `${t('cycleScore.earlyBull')} (${score}): ${t('cycleScore.earlyBullDesc')}` })
+    else if (score <= 59) result.push({ type: 'neutral', text: `${t('cycleScore.midBull')} (${score}): ${t('cycleScore.midBullDesc')}` })
+    else if (score <= 74) result.push({ type: 'bearish', text: `${t('cycleScore.lateBull')} (${score}): ${t('cycleScore.lateBullDesc')}` })
+    else if (score <= 84) result.push({ type: 'bearish', text: `${t('cycleScore.distribution')} (${score}): ${t('cycleScore.distributionDesc')}` })
+    else result.push({ type: 'bearish', text: `${t('cycleScore.euphoria')} (${score}): ${t('cycleScore.euphoriaDesc')}` })
 
     // Components analysis
     if (components.length > 0) {
       const highest = components.reduce((a, b) => ((a.value || 0) > (b.value || 0) ? a : b))
       const lowest = components.reduce((a, b) => ((a.value || 0) < (b.value || 0) ? a : b))
-      result.push({ type: 'bearish', text: `Componente mas bajista: ${highest.name} (${highest.value}/100)` })
-      result.push({ type: 'bullish', text: `Componente mas alcista: ${lowest.name} (${lowest.value}/100)` })
+      result.push({ type: 'bearish', text: `${t('cycleScore.mostBearish')} ${highest.name} (${highest.value}/100)` })
+      result.push({ type: 'bullish', text: `${t('cycleScore.mostBullish')} ${lowest.name} (${lowest.value}/100)` })
     }
 
     // History trend
@@ -82,34 +76,27 @@ export default function CycleScore() {
       const thirtyDaysAgo = reversed[reversed.length - 31] || reversed[0]
       if (current && thirtyDaysAgo) {
         if (current.score > thirtyDaysAgo.score) {
-          result.push({ type: 'bearish', text: `Tendencia: score subiendo (hace 30d: ${thirtyDaysAgo.score}, ahora: ${current.score})` })
+          result.push({ type: 'bearish', text: `${t('cycleScore.trendUp')} (${t('cycleScore.ago30d')} ${thirtyDaysAgo.score}, ${t('cycleScore.now')} ${current.score})` })
         } else if (current.score < thirtyDaysAgo.score) {
-          result.push({ type: 'bullish', text: `Tendencia: score bajando (hace 30d: ${thirtyDaysAgo.score}, ahora: ${current.score})` })
+          result.push({ type: 'bullish', text: `${t('cycleScore.trendDown')} (${t('cycleScore.ago30d')} ${thirtyDaysAgo.score}, ${t('cycleScore.now')} ${current.score})` })
         }
       }
     }
 
     return result
-  }, [cs, components, history])
+  }, [cs, components, history, t])
 
-  if (loading) return <div className="p-6"><PageHeader title="Cycle Score" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
-  if (!cs) return <div className="p-6"><PageHeader title="Cycle Score" /><EmptyState command="btc-intel analyze cycle-score" /></div>
+  if (loading) return <div className="p-6"><PageHeader title={t('cycleScore.title')} /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
+  if (!cs) return <div className="p-6"><PageHeader title={t('cycleScore.title')} /><EmptyState command="btc-intel analyze cycle-score" /></div>
 
   const phaseColor = PHASE_COLORS[cs.phase || ''] || '#f7931a'
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <PageHeader title="Cycle Score" subtitle="Composite indicator 0-100">
+      <PageHeader title={t('cycleScore.title')} subtitle={t('cycleScore.subtitle')}>
         <HelpButton
-          title="Cycle Score - Indicador de Ciclo"
-          content={[
-            "El Cycle Score es un indicador compuesto propietario que condensa multiples metricas en un numero entre 0 y 100, indicando donde estamos en el ciclo de mercado de Bitcoin.",
-            "0 = Bottom absoluto / maxima oportunidad de compra. 100 = Top absoluto / maximo riesgo.",
-            "Fases: Capitulacion (0-14), Acumulacion (15-29), Bull Temprano (30-44), Bull Medio (45-59), Bull Tardio (60-74), Distribucion (75-84), Euforia (85-100).",
-            "Componentes: SMA Position (20%), Price Position (20%), Halving Position (15%), RSI Mensual (10%), Hash Rate Momentum (10%), Fear & Greed (5%), F&G 30D (5%).",
-            "Las barras de componentes muestran cuanto aporta cada metrica al score total. Verde = bajo riesgo, Naranja = cautela, Rojo = alto riesgo.",
-            "IMPORTANTE: No es predictivo. Indica DONDE estamos en el ciclo, no donde iremos. Usalo como contexto, no como senal de trading.",
-          ]}
+          title={t('cycleScore.helpTitle')}
+          content={ta('cycleScore')}
         />
       </PageHeader>
 
@@ -126,21 +113,21 @@ export default function CycleScore() {
               <span className="text-xs text-text-muted">/100</span>
             </div>
           </div>
-          <span className="font-display font-semibold" style={{ color: phaseColor }}>{PHASE_LABELS[cs.phase || ''] || cs.phase}</span>
+          <span className="font-display font-semibold" style={{ color: phaseColor }}>{phaseLabel(cs.phase || '')}</span>
           <span className="text-xs text-text-muted mt-1">{formatDate(cs.date)}</span>
         </div>
 
         <div className="lg:col-span-2 grid grid-cols-2 gap-4">
-          <MetricCard title="Score" value={`${cs.score}/100`} subtitle={PHASE_LABELS[cs.phase || '']} />
-          <MetricCard title="Phase" value={PHASE_LABELS[cs.phase || ''] || cs.phase || 'N/A'} />
-          <MetricCard title="Components" value={`${components.length}`} subtitle="active inputs" icon={<BarChartIcon className="w-4 h-4" />} />
-          <MetricCard title="Date" value={formatDate(cs.date)} />
+          <MetricCard title={t('cycleScore.score')} value={`${cs.score}/100`} subtitle={phaseLabel(cs.phase || '')} />
+          <MetricCard title={t('cycleScore.phase')} value={phaseLabel(cs.phase || '') || 'N/A'} />
+          <MetricCard title={t('cycleScore.components')} value={`${components.length}`} subtitle={t('cycleScore.activeInputs')} icon={<BarChartIcon className="w-4 h-4" />} />
+          <MetricCard title={t('cycleScore.date')} value={formatDate(cs.date)} />
         </div>
       </div>
 
       {/* Component Breakdown */}
       <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-        <h3 className="font-display font-semibold mb-4">Component Breakdown</h3>
+        <h3 className="font-display font-semibold mb-4">{t('cycleScore.componentBreakdown')}</h3>
         <div className="space-y-3">
           {components.map((c) => (
             <div key={c.name} className="flex items-center gap-3">
@@ -158,7 +145,7 @@ export default function CycleScore() {
       </div>
 
       {/* Score History */}
-      <ChartContainer title="Score History (90d)">
+      <ChartContainer title={t('cycleScore.history')}>
         <div className="h-48">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={historyChart}>
@@ -174,7 +161,7 @@ export default function CycleScore() {
 
       {/* Interpretacion */}
       <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
-        <h3 className="font-display font-semibold mb-3">Interpretacion</h3>
+        <h3 className="font-display font-semibold mb-3">{t('common.interpretation')}</h3>
         <div className="space-y-2">
           {insights.map((insight, i) => (
             <div key={i} className="flex items-start gap-2">

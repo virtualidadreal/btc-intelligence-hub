@@ -478,6 +478,9 @@ const S: Record<Lang, Record<string, string>> = {
     'onchain.oiLow': 'Open Interest bajo vs media 30D: poco apalancamiento, movimientos potencialmente mas organicos',
     'onchain.oiNormal': 'Open Interest en rango normal vs media 30D',
 
+    // Level Map
+    'trading.levelMap': 'Mapa de Niveles — S/R + Fibonacci + Volumen',
+
     // Backtesting / Signal History
     'trading.signalAccuracy': 'Precision de Señales',
     'trading.winRate': 'Win Rate',
@@ -984,6 +987,9 @@ const S: Record<Lang, Record<string, string>> = {
     'onchain.oiHigh': 'Open Interest high vs 30D avg: high leverage in market, greater liquidation risk',
     'onchain.oiLow': 'Open Interest low vs 30D avg: low leverage, potentially more organic moves',
     'onchain.oiNormal': 'Open Interest in normal range vs 30D avg',
+
+    // Level Map
+    'trading.levelMap': 'Level Map — S/R + Fibonacci + Volume',
 
     // Backtesting / Signal History
     'trading.signalAccuracy': 'Signal Accuracy',

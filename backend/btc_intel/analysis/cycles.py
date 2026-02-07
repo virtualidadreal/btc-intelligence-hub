@@ -1,4 +1,4 @@
-"""Cycles Engine — Análisis de ciclos y comparativas."""
+"""Cycles Engine — Cycle analysis and comparisons."""
 
 from datetime import date, timedelta
 
@@ -18,16 +18,16 @@ HALVINGS = [
 
 
 def analyze_cycles() -> dict:
-    """Analiza posición en el ciclo actual y compara con anteriores."""
+    """Analyze position in the current cycle and compare with previous ones."""
     db = get_supabase()
-    console.print("[cyan]Analizando ciclos...[/cyan]")
+    console.print("[cyan]Analyzing cycles...[/cyan]")
 
     today = date.today()
     last_halving = max(h for h in HALVINGS if h <= today)
     days_since_halving = (today - last_halving).days
     cycle_number = HALVINGS.index(last_halving) + 1
 
-    # Cargar precios (paginated to avoid PostgREST row limit)
+    # Load prices (paginated to avoid PostgREST row limit)
     all_prices = []
     page_size = 1000
     offset = 0
@@ -47,7 +47,7 @@ def analyze_cycles() -> dict:
     df["close"] = df["close"].astype(float)
     df["date"] = pd.to_datetime(df["date"]).dt.date
 
-    # Precio al halving
+    # Price at halving
     halving_price = None
     for row in all_prices:
         if row["date"] == str(last_halving):
@@ -55,7 +55,7 @@ def analyze_cycles() -> dict:
             break
 
     if not halving_price:
-        # Buscar el precio más cercano
+        # Find closest price
         close_rows = [r for r in all_prices if r["date"] >= str(last_halving - timedelta(days=3))]
         if close_rows:
             halving_price = float(close_rows[0]["close"])
@@ -63,7 +63,7 @@ def analyze_cycles() -> dict:
     current_price = float(all_prices[-1]["close"])
     roi_since_halving = ((current_price - halving_price) / halving_price * 100) if halving_price else 0
 
-    # Comparativa con ciclos anteriores al mismo día
+    # Compare with previous cycles at the same day
     comparisons = {}
     for i, halving in enumerate(HALVINGS[:-1]):
         target_date = halving + timedelta(days=days_since_halving)
@@ -78,7 +78,7 @@ def analyze_cycles() -> dict:
 
         if h_price and t_price:
             roi = (t_price - h_price) / h_price * 100
-            comparisons[f"Ciclo {i+1}"] = {
+            comparisons[f"Cycle {i+1}"] = {
                 "halving_date": str(halving),
                 "days": days_since_halving,
                 "halving_price": h_price,
@@ -96,10 +96,10 @@ def analyze_cycles() -> dict:
         "comparisons": comparisons,
     }
 
-    console.print(f"  Ciclo: #{cycle_number} | Días desde halving: {days_since_halving}")
-    console.print(f"  ROI desde halving: {roi_since_halving:+.2f}%")
+    console.print(f"  Cycle: #{cycle_number} | Days since halving: {days_since_halving}")
+    console.print(f"  ROI since halving: {roi_since_halving:+.2f}%")
     for name, comp in comparisons.items():
-        console.print(f"  {name} al día {days_since_halving}: {comp['roi']:+.2f}%")
+        console.print(f"  {name} - day {days_since_halving}: {comp['roi']:+.2f}%")
 
-    console.print(f"[green]✅ Cycle analysis completado[/green]")
+    console.print(f"[green]Cycle analysis completed[/green]")
     return result

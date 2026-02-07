@@ -1,4 +1,4 @@
-"""Macro Engine — Correlaciones y análisis macro."""
+"""Macro Engine — Correlations and macro analysis."""
 
 import pandas as pd
 import numpy as np

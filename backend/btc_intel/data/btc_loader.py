@@ -1,4 +1,4 @@
-"""BTC Price Loader — Descarga precios históricos de Bitcoin via yfinance."""
+"""BTC Price Loader — Download historical Bitcoin prices via yfinance."""
 
 from datetime import date, timedelta
 
@@ -36,7 +36,7 @@ async def load_btc_prices(since: date | None = None) -> int:
     df = ticker.history(start=str(since), end=str(today + timedelta(days=1)))
 
     if df.empty:
-        console.print("[yellow]Sin datos nuevos de BTC[/yellow]")
+        console.print("[yellow]No new BTC data[/yellow]")
         return 0
 
     rows = []

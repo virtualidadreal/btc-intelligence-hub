@@ -1,4 +1,4 @@
-"""Cycles Seed — Define ciclos históricos de Bitcoin."""
+"""Cycles Seed — Define Bitcoin's historical cycles."""
 
 from rich.console import Console
 
@@ -7,10 +7,10 @@ from btc_intel.db import get_supabase
 console = Console()
 
 CYCLES = [
-    # Halving cycles completos
+    # Complete halving cycles
     # bottom = bear market low after the peak, NOT the halving date price
     {
-        "name": "Ciclo Halving 1 (2012-2016)",
+        "name": "Halving Cycle 1 (2012-2016)",
         "type": "halving",
         "start_date": "2012-11-28",
         "end_date": "2016-07-09",
@@ -25,7 +25,7 @@ CYCLES = [
         "max_drawdown": -87.00,
     },
     {
-        "name": "Ciclo Halving 2 (2016-2020)",
+        "name": "Halving Cycle 2 (2016-2020)",
         "type": "halving",
         "start_date": "2016-07-09",
         "end_date": "2020-05-11",
@@ -40,7 +40,7 @@ CYCLES = [
         "max_drawdown": -84.00,
     },
     {
-        "name": "Ciclo Halving 3 (2020-2024)",
+        "name": "Halving Cycle 3 (2020-2024)",
         "type": "halving",
         "start_date": "2020-05-11",
         "end_date": "2024-04-20",
@@ -55,7 +55,7 @@ CYCLES = [
         "max_drawdown": -77.00,
     },
     {
-        "name": "Ciclo Halving 4 (2024-presente)",
+        "name": "Halving Cycle 4 (2024-present)",
         "type": "halving",
         "start_date": "2024-04-20",
         "end_date": None,
@@ -149,9 +149,9 @@ CYCLES = [
 
 
 def seed_cycles() -> int:
-    """Carga ciclos históricos en Supabase."""
+    """Load historical cycles into Supabase."""
     db = get_supabase()
-    console.print("[cyan]Cargando ciclos históricos...[/cyan]")
+    console.print("[cyan]Loading historical cycles...[/cyan]")
 
     inserted = 0
     for cycle in CYCLES:
@@ -170,5 +170,5 @@ def seed_cycles() -> int:
         except Exception as e:
             console.print(f"  [red]Error: {cycle['name']} — {e}[/red]")
 
-    console.print(f"[green]✅ Ciclos: {inserted} nuevos de {len(CYCLES)} totales[/green]")
+    console.print(f"[green]Cycles: {inserted} new of {len(CYCLES)} total[/green]")
     return inserted

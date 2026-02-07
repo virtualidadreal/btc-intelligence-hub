@@ -61,7 +61,7 @@ def _load_yahoo_asset(db, asset_name: str, ticker: str, since: date | None) -> i
 
     today = date.today()
     if since >= today:
-        console.print(f"  [dim]{asset_name}: ya actualizado[/dim]")
+        console.print(f"  [dim]{asset_name}: already up to date[/dim]")
         return 0
 
     console.print(f"  [cyan]{asset_name} ({ticker}): {since} → {today}[/cyan]")
@@ -118,7 +118,7 @@ def _load_fred_series(db, asset_name: str, series_id: str, since: date | None) -
 
     today = date.today()
     if since >= today:
-        console.print(f"  [dim]{asset_name}: ya actualizado[/dim]")
+        console.print(f"  [dim]{asset_name}: already up to date[/dim]")
         return 0
 
     console.print(f"  [cyan]{asset_name} (FRED {series_id}): {since} → {today}[/cyan]")

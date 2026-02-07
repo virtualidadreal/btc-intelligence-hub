@@ -1,4 +1,4 @@
-"""Context Builder — Genera contexto estructurado para Claude Code."""
+"""Context Builder — Generates structured context for Claude Code."""
 
 from datetime import date, timedelta
 
@@ -22,7 +22,7 @@ from btc_intel.context.formatters import (
 
 def build_context(scope: str = "summary", area: str | None = None,
                   period1: str | None = None, period2: str | None = None) -> str:
-    """Punto de entrada principal. Construye contexto según scope."""
+    """Main entry point. Builds context based on scope."""
     if scope == "summary":
         return _build_summary()
     elif scope == "morning":
@@ -32,76 +32,76 @@ def build_context(scope: str = "summary", area: str | None = None,
     elif scope == "compare":
         return _build_compare(period1, period2)
     else:
-        return f"Scope desconocido: {scope}"
+        return f"Unknown scope: {scope}"
 
 
 def _build_summary() -> str:
-    """Summary: ~500-800 tokens. Vista rápida del estado actual."""
+    """Summary: ~500-800 tokens. Quick view of current state."""
     db = get_supabase()
     sections = []
 
-    sections.append("# BTC Intelligence Hub — Resumen\n")
-    sections.append(f"Fecha: {date.today()}\n")
+    sections.append("# BTC Intelligence Hub — Summary\n")
+    sections.append(f"Date: {date.today()}\n")
 
-    # Precio
+    # Price
     sections.append(format_price_section(db))
 
     # Cycle Score
     sections.append(format_cycle_score_section(db))
 
-    # Resumen por área (1 línea)
-    sections.append("## Señales por Área\n")
+    # Area signals (1 line each)
+    sections.append("## Signals by Area\n")
     sections.append(format_technical_section(db, brief=True))
     sections.append(format_onchain_section(db, brief=True))
     sections.append(format_macro_section(db, brief=True))
     sections.append(format_sentiment_section(db, brief=True))
 
-    # Confluencias
+    # Confluences
     sections.append(format_confluences_section(db))
 
-    # Alertas activas
+    # Active alerts
     sections.append(format_alerts_section(db))
 
-    # Últimas conclusiones
+    # Recent conclusions
     sections.append(format_conclusions_section(db, limit=3))
 
     return "\n".join(s for s in sections if s)
 
 
 def _build_morning() -> str:
-    """Morning: ~1500 tokens. Todo de summary + cambios y eventos."""
+    """Morning: ~1500 tokens. Everything from summary + changes and events."""
     db = get_supabase()
     sections = []
 
     sections.append("# BTC Intelligence Hub — Morning Briefing\n")
-    sections.append(f"Fecha: {date.today()}\n")
+    sections.append(f"Date: {date.today()}\n")
 
-    # Precio
+    # Price
     sections.append(format_price_section(db))
 
     # Cycle Score
     sections.append(format_cycle_score_section(db))
 
-    # Señales por área
-    sections.append("## Señales por Área\n")
+    # Signals by area
+    sections.append("## Signals by Area\n")
     sections.append(format_technical_section(db, brief=True))
     sections.append(format_onchain_section(db, brief=True))
     sections.append(format_macro_section(db, brief=True))
     sections.append(format_sentiment_section(db, brief=True))
 
-    # Cambios desde ayer
+    # Changes since yesterday
     sections.append(format_signal_changes(db))
 
-    # Eventos próximos
+    # Upcoming events
     sections.append(format_events_section(db))
 
-    # Confluencias
+    # Confluences
     sections.append(format_confluences_section(db))
 
-    # Alertas detalladas
+    # Detailed alerts
     sections.append(format_alerts_section(db, detailed=True))
 
-    # Conclusiones recientes
+    # Recent conclusions
     sections.append(format_conclusions_section(db, limit=5))
 
     # Risk
@@ -111,14 +111,14 @@ def _build_morning() -> str:
 
 
 def _build_deep(area: str) -> str:
-    """Deep: ~2000-3000 tokens. Detalle completo de un área."""
+    """Deep: ~2000-3000 tokens. Full detail of an area."""
     db = get_supabase()
     sections = []
 
     sections.append(f"# BTC Intelligence Hub — Deep: {area.upper()}\n")
-    sections.append(f"Fecha: {date.today()}\n")
+    sections.append(f"Date: {date.today()}\n")
 
-    # Precio como referencia
+    # Price as reference
     sections.append(format_price_section(db))
 
     area_map = {
@@ -132,7 +132,7 @@ def _build_deep(area: str) -> str:
     if area in area_map:
         sections.append(area_map[area]())
     else:
-        sections.append(f"Área desconocida: {area}")
+        sections.append(f"Unknown area: {area}")
 
     # Cycle Score
     sections.append(format_cycle_score_section(db))
@@ -140,22 +140,22 @@ def _build_deep(area: str) -> str:
     # Risk
     sections.append(format_risk_section(db))
 
-    # Conclusiones del área
+    # Area conclusions
     sections.append(format_conclusions_section(db, limit=5, category=area))
 
     return "\n".join(s for s in sections if s)
 
 
 def _build_compare(period1: str | None, period2: str | None) -> str:
-    """Compare: ~3000 tokens. Dos períodos side by side."""
+    """Compare: ~3000 tokens. Two periods side by side."""
     db = get_supabase()
     sections = []
 
     p1 = period1 or str(date.today() - timedelta(days=30))
     p2 = period2 or str(date.today())
 
-    sections.append(f"# BTC Intelligence Hub — Comparativa\n")
-    sections.append(f"Período 1: {p1} | Período 2: {p2}\n")
+    sections.append(f"# BTC Intelligence Hub — Comparison\n")
+    sections.append(f"Period 1: {p1} | Period 2: {p2}\n")
 
     sections.append(format_compare_section(db, p1, p2))
 

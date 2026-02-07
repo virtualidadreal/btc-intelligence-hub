@@ -132,6 +132,24 @@ export interface SignalHistory {
   price_at_signal: number
   price_1h_later: number | null
   outcome_1h: string | null
+  // v2 fields
+  setup_type: string | null
+  sl: number | null
+  tp1: number | null
+  tp2: number | null
+  sl_method: string | null
+  tp1_method: string | null
+  tp2_method: string | null
+  level_score: number | null
+  candle_pattern: string | null
+  candle_score: number | null
+  onchain_bonus: number | null
+  penalties: number | null
+  extended_score: number | null
+  nearby_levels: Record<string, unknown>[] | null
+  fib_context: Record<string, unknown> | null
+  outcome: string | null
+  hit_at: string | null
   created_at: string
 }
 
@@ -151,6 +169,57 @@ export interface PortfolioPosition {
   pnl_percent: number | null
   notes: string | null
   created_at: string
+}
+
+// Trading v2 types
+export interface PriceLevel {
+  id: number
+  price: number
+  price_low: number | null
+  price_high: number | null
+  type: string
+  strength: number
+  classification: string | null
+  source: string[] | null
+  timeframes: string[] | null
+  touch_count: number
+  last_touch_date: string | null
+  fib_level: number | null
+  is_role_flip: boolean
+  is_psychological: boolean
+  is_high_volume: boolean
+  status: string
+  updated_at: string
+}
+
+export interface FibonacciLevel {
+  id: number
+  timeframe: string
+  type: string
+  direction: string
+  swing_low: number
+  swing_high: number
+  swing_low_date: string | null
+  swing_high_date: string | null
+  pullback_end: number | null
+  levels: Record<string, unknown>
+  status: string
+  updated_at: string
+}
+
+export interface ConfluenceZone {
+  id: number
+  price_low: number
+  price_high: number
+  price_mid: number
+  type: string
+  timeframes: string[]
+  fib_ratios: number[] | null
+  num_timeframes: number
+  strength: number
+  has_gran_nivel: boolean
+  status: string
+  updated_at: string
 }
 
 export interface Report {

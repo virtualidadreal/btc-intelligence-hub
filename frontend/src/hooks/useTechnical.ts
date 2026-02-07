@@ -68,10 +68,10 @@ const SIGNAL_SCORE: Record<SignalLabel, number> = {
 }
 
 const WEIGHTS: Record<string, Record<string, number>> = {
-  '1H': { RSI_14: 0.35, MACD: 0.35, SMA_CROSS: 0.00, BB: 0.20, FEAR_GREED: 0.10, HASH_RATE_MOM: 0.00, NVT_RATIO: 0.00, CYCLE_SCORE: 0.00 },
-  '4H': { RSI_14: 0.25, MACD: 0.25, SMA_CROSS: 0.10, BB: 0.15, FEAR_GREED: 0.15, HASH_RATE_MOM: 0.05, NVT_RATIO: 0.05, CYCLE_SCORE: 0.00 },
-  '1D': { RSI_14: 0.15, MACD: 0.15, SMA_CROSS: 0.15, BB: 0.10, FEAR_GREED: 0.15, HASH_RATE_MOM: 0.10, NVT_RATIO: 0.10, CYCLE_SCORE: 0.10 },
-  '1W': { RSI_14: 0.05, MACD: 0.10, SMA_CROSS: 0.25, BB: 0.00, FEAR_GREED: 0.10, HASH_RATE_MOM: 0.15, NVT_RATIO: 0.15, CYCLE_SCORE: 0.20 },
+  '1H': { RSI_14: 0.25, MACD: 0.25, SMA_CROSS: 0.00, BB: 0.15, EMA_21: 0.15, FEAR_GREED: 0.10, HASH_RATE_MOM: 0.00, NVT_RATIO: 0.00, CYCLE_SCORE: 0.10 },
+  '4H': { RSI_14: 0.20, MACD: 0.20, SMA_CROSS: 0.10, BB: 0.10, EMA_21: 0.15, FEAR_GREED: 0.15, HASH_RATE_MOM: 0.05, NVT_RATIO: 0.05, CYCLE_SCORE: 0.00 },
+  '1D': { RSI_14: 0.15, MACD: 0.15, SMA_CROSS: 0.15, BB: 0.10, EMA_21: 0.10, FEAR_GREED: 0.10, HASH_RATE_MOM: 0.10, NVT_RATIO: 0.05, CYCLE_SCORE: 0.10 },
+  '1W': { RSI_14: 0.05, MACD: 0.10, SMA_CROSS: 0.25, BB: 0.00, EMA_21: 0.05, FEAR_GREED: 0.10, HASH_RATE_MOM: 0.15, NVT_RATIO: 0.10, CYCLE_SCORE: 0.20 },
 }
 
 function signalToScore(signal: string | null): number {
@@ -92,6 +92,15 @@ function cycleScoreToSignal(score: number): SignalLabel {
   if (score <= 40) return 'bullish'
   if (score <= 60) return 'neutral'
   if (score <= 80) return 'bearish'
+  return 'extreme_bearish'
+}
+
+function emaToSignal(price: number, ema: number): SignalLabel {
+  const pct = ((price - ema) / ema) * 100
+  if (pct > 5) return 'extreme_bullish'
+  if (pct > 1) return 'bullish'
+  if (pct > -1) return 'neutral'
+  if (pct > -5) return 'bearish'
   return 'extreme_bearish'
 }
 
@@ -133,6 +142,7 @@ export const SIGNAL_LABELS: Record<string, string> = {
   MACD: 'MACD',
   SMA_CROSS: 'SMA Cross',
   BB: 'Bollinger Bands',
+  EMA_21: 'EMA (21)',
   FEAR_GREED: 'Fear & Greed',
   HASH_RATE_MOM: 'Hash Rate Mom.',
   NVT_RATIO: 'NVT Ratio',
@@ -321,6 +331,13 @@ export function useTradingRecommendations(
     const findVal = (name: string) => {
       const found = allIndicators?.find((i) => i.indicator === name)
       return found?.value ?? null
+    }
+
+    // EMA(21) — price position relative to EMA
+    const ema21 = findVal('EMA_21')
+    if (ema21 && currentPrice) {
+      signalMap['EMA_21'] = emaToSignal(currentPrice, ema21)
+      valueMap['EMA_21'] = ema21
     }
     const atr = findVal('ATR_14')
     const bbUpper = findVal('BB_UPPER')

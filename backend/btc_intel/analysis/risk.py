@@ -10,9 +10,9 @@ console = Console()
 
 
 def analyze_risk() -> dict:
-    """Calcula métricas de riesgo."""
+    """Calculate risk metrics."""
     db = get_supabase()
-    console.print("[cyan]Calculando métricas de riesgo...[/cyan]")
+    console.print("[cyan]Calculating risk metrics...[/cyan]")
 
     # Paginated fetch to avoid PostgREST row limit
     all_prices = []
@@ -99,5 +99,5 @@ def analyze_risk() -> dict:
     console.print(f"  Volatilidad 30d: {vol_30d:.2f}%")
     console.print(f"  Sharpe (365d): {sharpe_365d:.4f}")
     console.print(f"  VaR 95%: {var_95:.2f}%")
-    console.print(f"[green]✅ Risk analysis completado[/green]")
+    console.print(f"[green]Risk analysis completed[/green]")
     return result

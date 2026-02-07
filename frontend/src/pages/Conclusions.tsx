@@ -5,14 +5,16 @@ import HelpButton from '../components/common/HelpButton'
 import PageHeader from '../components/common/PageHeader'
 import { useConclusions } from '../hooks/useConclusions'
 import { formatDate } from '../lib/utils'
+import { useI18n } from '../lib/i18n'
 
 const CATEGORIES = ['all', 'technical', 'onchain', 'macro', 'sentiment', 'cycle', 'general']
 
 export default function Conclusions() {
+  const { t, ta } = useI18n()
   const [category, setCategory] = useState<string>('all')
   const { data: conclusions, loading } = useConclusions(category === 'all' ? undefined : category)
 
-  if (loading) return <div className="p-6"><PageHeader title="Conclusions" /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
+  if (loading) return <div className="p-6"><PageHeader title={t('conclusions.title')} /><div className="animate-pulse h-64 bg-bg-secondary rounded-xl" /></div>
 
   const validated = conclusions?.filter((c) => c.validated_outcome) || []
   const correct = validated.filter((c) => c.validated_outcome === 'correct').length
@@ -20,24 +22,17 @@ export default function Conclusions() {
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
-      <PageHeader title="Conclusions" subtitle="Intelligence journal">
+      <PageHeader title={t('conclusions.title')} subtitle={t('conclusions.subtitle')}>
         <div className="flex items-center gap-3">
           {validated.length > 0 && (
             <div className="text-right">
               <span className="text-2xl font-mono font-bold text-accent-btc">{accuracy}%</span>
-              <span className="text-xs text-text-muted block">accuracy ({validated.length} validated)</span>
+              <span className="text-xs text-text-muted block">{t('conclusions.accuracy')} ({validated.length} {t('conclusions.validated')})</span>
             </div>
           )}
           <HelpButton
-            title="Sistema de Conclusiones"
-            content={[
-              "Diario de inteligencia donde se registran analisis y predicciones sobre Bitcoin para tracking y validacion posterior.",
-              "Cada conclusion incluye: titulo, contenido del analisis, categoria (technical/onchain/macro/sentiment/cycle), nivel de confianza (1-10), y tags.",
-              "Data Snapshot: Al crear una conclusion, se guarda automaticamente el precio de BTC, Cycle Score y RSI de ese momento para contexto futuro.",
-              "Validacion: Las conclusiones se pueden validar como correct/incorrect/partial cuando pasa el tiempo y se conoce el resultado real.",
-              "Accuracy: El porcentaje muestra la precision de tus predicciones validadas. Se calcula como (correctas + 0.5*parciales) / total.",
-              "Usa 'btc-intel conclude --add texto --title titulo' para crear conclusiones y 'btc-intel conclude --validate ID --outcome correct' para validarlas.",
-            ]}
+            title={t('conclusions.helpTitle')}
+            content={ta('conclusions')}
           />
         </div>
       </PageHeader>
@@ -52,13 +47,13 @@ export default function Conclusions() {
               category === cat ? 'bg-accent-btc/20 text-accent-btc border border-accent-btc/30' : 'text-text-muted hover:text-text-secondary border border-border'
             }`}
           >
-            {cat}
+            {cat === 'all' ? t('conclusions.all') : cat}
           </button>
         ))}
       </div>
 
       {!conclusions?.length ? (
-        <EmptyState message="No conclusions" command='btc-intel conclude --add "text" --title "title"' />
+        <EmptyState message={t('conclusions.noData')} command='btc-intel conclude --add "text" --title "title"' />
       ) : (
         <div className="space-y-4">
           {conclusions.map((c) => (
@@ -78,7 +73,7 @@ export default function Conclusions() {
                     <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
                       c.validated_outcome === 'correct' ? 'bg-bullish/20 text-bullish' : c.validated_outcome === 'incorrect' ? 'bg-bearish/20 text-bearish' : 'bg-neutral-signal/20 text-neutral-signal'
                     }`}>
-                      {c.validated_outcome}
+                      {c.validated_outcome === 'correct' ? t('conclusions.correct') : c.validated_outcome === 'incorrect' ? t('conclusions.incorrect') : t('conclusions.partial')}
                     </span>
                   )}
                 </div>
@@ -90,8 +85,8 @@ export default function Conclusions() {
                 {c.tags && c.tags.length > 0 && (
                   <div className="flex items-center gap-1">
                     <Tag className="w-3 h-3 text-text-muted" />
-                    {c.tags.map((t) => (
-                      <span key={t} className="text-[10px] text-text-muted">{t}</span>
+                    {c.tags.map((tg) => (
+                      <span key={tg} className="text-[10px] text-text-muted">{tg}</span>
                     ))}
                   </div>
                 )}

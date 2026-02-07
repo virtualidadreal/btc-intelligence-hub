@@ -1,4 +1,4 @@
-"""Conclusions Manager — CRUD completo con versioning y validación."""
+"""Conclusions Manager — Full CRUD with versioning and validation."""
 
 from datetime import date
 
@@ -11,10 +11,10 @@ console = Console()
 
 
 def _get_data_snapshot(db) -> dict:
-    """Captura snapshot del estado actual de los datos."""
+    """Capture snapshot of the current data state."""
     snapshot = {}
 
-    # Precio BTC
+    # BTC Price
     price = db.table("btc_prices").select("close").order("date", desc=True).limit(1).execute()
     if price.data:
         snapshot["btc_price"] = float(price.data[0]["close"])
@@ -55,7 +55,7 @@ def _get_data_snapshot(db) -> dict:
 def create(content: str, title: str, category: str = "general",
            confidence: int = 5, tags: str | None = None,
            source: str = "claude") -> dict:
-    """Crea una nueva conclusión con data_snapshot automático."""
+    """Create a new conclusion with automatic data_snapshot."""
     db = get_supabase()
 
     snapshot = _get_data_snapshot(db)
@@ -77,19 +77,19 @@ def create(content: str, title: str, category: str = "general",
 
     if result.data:
         conclusion = result.data[0]
-        console.print(f"[green]Conclusión #{conclusion['id']} creada: {title}[/green]")
-        console.print(f"  Categoría: {category} | Confianza: {confidence}/10")
+        console.print(f"[green]Conclusion #{conclusion['id']} created: {title}[/green]")
+        console.print(f"  Category: {category} | Confidence: {confidence}/10")
         console.print(f"  Snapshot: BTC ${snapshot.get('btc_price', 'N/A'):,.2f}, "
                       f"Score {snapshot.get('cycle_score', 'N/A')}")
         return conclusion
 
-    console.print("[red]Error creando conclusión[/red]")
+    console.print("[red]Error creating conclusion[/red]")
     return {}
 
 
 def list_conclusions(category: str | None = None, status: str = "active",
                      tags: str | None = None, limit: int = 20) -> list:
-    """Lista conclusiones con filtros."""
+    """List conclusions with filters."""
     db = get_supabase()
 
     query = db.table("conclusions").select("*").eq("status", status).order("created_at", desc=True)
@@ -100,14 +100,14 @@ def list_conclusions(category: str | None = None, status: str = "active",
     result = query.limit(limit).execute()
 
     if not result.data:
-        console.print("[dim]Sin conclusiones[/dim]")
+        console.print("[dim]No conclusions[/dim]")
         return []
 
-    table = Table(title="Conclusiones", border_style="bright_blue")
+    table = Table(title="Conclusions", border_style="bright_blue")
     table.add_column("ID", style="dim")
-    table.add_column("Fecha", style="dim")
+    table.add_column("Date", style="dim")
     table.add_column("Cat")
-    table.add_column("Título")
+    table.add_column("Title")
     table.add_column("Conf", justify="center")
     table.add_column("Tags")
     table.add_column("Outcome")
@@ -130,12 +130,12 @@ def list_conclusions(category: str | None = None, status: str = "active",
 
 
 def refine(conclusion_id: int, new_content: str) -> dict:
-    """Crea versión refinada de una conclusión existente."""
+    """Create a refined version of an existing conclusion."""
     db = get_supabase()
 
     original = db.table("conclusions").select("*").eq("id", conclusion_id).limit(1).execute()
     if not original.data:
-        console.print(f"[red]Conclusión #{conclusion_id} no encontrada[/red]")
+        console.print(f"[red]Conclusion #{conclusion_id} not found[/red]")
         return {}
 
     orig = original.data[0]
@@ -143,7 +143,7 @@ def refine(conclusion_id: int, new_content: str) -> dict:
 
     record = {
         "date": str(date.today()),
-        "title": f"[Refinamiento] {orig['title']}",
+        "title": f"[Refinement] {orig['title']}",
         "content": new_content,
         "category": orig["category"],
         "confidence": orig.get("confidence", 5),
@@ -160,19 +160,19 @@ def refine(conclusion_id: int, new_content: str) -> dict:
         new = result.data[0]
         # Archive the original
         db.table("conclusions").update({"status": "refined"}).eq("id", conclusion_id).execute()
-        console.print(f"[green]Refinamiento #{new['id']} creado (parent: #{conclusion_id})[/green]")
+        console.print(f"[green]Refinement #{new['id']} created (parent: #{conclusion_id})[/green]")
         return new
 
     return {}
 
 
 def validate(conclusion_id: int, outcome: str, notes: str | None = None) -> dict:
-    """Marca una conclusión como correct/incorrect/partial."""
+    """Mark a conclusion as correct/incorrect/partial."""
     db = get_supabase()
 
     valid_outcomes = ["correct", "incorrect", "partial"]
     if outcome not in valid_outcomes:
-        console.print(f"[red]Outcome inválido. Opciones: {', '.join(valid_outcomes)}[/red]")
+        console.print(f"[red]Invalid outcome. Options: {', '.join(valid_outcomes)}[/red]")
         return {}
 
     update = {
@@ -183,22 +183,22 @@ def validate(conclusion_id: int, outcome: str, notes: str | None = None) -> dict
     result = db.table("conclusions").update(update).eq("id", conclusion_id).execute()
 
     if result.data:
-        console.print(f"[green]Conclusión #{conclusion_id} validada: {outcome}[/green]")
+        console.print(f"[green]Conclusion #{conclusion_id} validated: {outcome}[/green]")
         return result.data[0]
 
-    console.print(f"[red]Error validando conclusión #{conclusion_id}[/red]")
+    console.print(f"[red]Error validating conclusion #{conclusion_id}[/red]")
     return {}
 
 
 def archive(conclusion_id: int):
-    """Archiva una conclusión."""
+    """Archive a conclusion."""
     db = get_supabase()
     db.table("conclusions").update({"status": "archived"}).eq("id", conclusion_id).execute()
-    console.print(f"[green]Conclusión #{conclusion_id} archivada[/green]")
+    console.print(f"[green]Conclusion #{conclusion_id} archived[/green]")
 
 
 def score() -> dict:
-    """Calcula precisión de predicciones."""
+    """Calculate prediction accuracy."""
     db = get_supabase()
 
     validated = (
@@ -209,7 +209,7 @@ def score() -> dict:
     )
 
     if not validated.data:
-        console.print("[dim]Sin conclusiones validadas[/dim]")
+        console.print("[dim]No validated conclusions[/dim]")
         return {"total": 0}
 
     total = len(validated.data)
@@ -239,12 +239,12 @@ def score() -> dict:
     }
 
     console.print(f"\n[bold]Precision Score[/bold]")
-    console.print(f"  Total validadas: {total}")
-    console.print(f"  Correctas: {correct} | Parciales: {partial} | Incorrectas: {incorrect}")
+    console.print(f"  Total validated: {total}")
+    console.print(f"  Correct: {correct} | Partial: {partial} | Incorrect: {incorrect}")
     console.print(f"  [bold]Accuracy: {accuracy:.1f}%[/bold]")
 
     for cat, stats in by_category.items():
         cat_acc = (stats["correct"] + stats["partial"] * 0.5) / stats["total"] * 100
-        console.print(f"  {cat}: {cat_acc:.0f}% ({stats['total']} validadas)")
+        console.print(f"  {cat}: {cat_acc:.0f}% ({stats['total']} validated)")
 
     return result

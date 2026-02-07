@@ -1,4 +1,4 @@
-"""Confluence Detector — Detecta confluencias entre señales."""
+"""Confluence Detector — Detects confluences between signals."""
 
 from rich.console import Console
 
@@ -8,13 +8,13 @@ console = Console()
 
 
 def detect_confluences() -> dict:
-    """Recoge señales de todas las áreas y detecta confluencias."""
+    """Collect signals from all areas and detect confluences."""
     db = get_supabase()
-    console.print("[cyan]Detectando confluencias...[/cyan]")
+    console.print("[cyan]Detecting confluences...[/cyan]")
 
     signals = {}
 
-    # Señales técnicas (últimos valores)
+    # Technical signals (latest values)
     for indicator in ["RSI_14", "MACD", "SMA_CROSS"]:
         res = (
             db.table("technical_indicators")
@@ -27,7 +27,7 @@ def detect_confluences() -> dict:
         if res.data and res.data[0]["signal"]:
             signals[f"tech_{indicator}"] = res.data[0]["signal"]
 
-    # Señales on-chain
+    # On-chain signals
     for metric in ["HASH_RATE_MOM_30D", "NVT_RATIO"]:
         res = (
             db.table("onchain_metrics")
@@ -41,7 +41,7 @@ def detect_confluences() -> dict:
         if res.data and res.data[0]["signal"]:
             signals[f"onchain_{metric}"] = res.data[0]["signal"]
 
-    # Sentimiento
+    # Sentiment
     res = (
         db.table("sentiment_data")
         .select("value")
@@ -59,7 +59,7 @@ def detect_confluences() -> dict:
         else:
             signals["sentiment_FG"] = "neutral"
 
-    # Detectar confluencias
+    # Detect confluences
     bullish = [k for k, v in signals.items() if "bullish" in v]
     bearish = [k for k, v in signals.items() if "bearish" in v]
     neutral = [k for k, v in signals.items() if v == "neutral"]
@@ -71,7 +71,7 @@ def detect_confluences() -> dict:
             "type": "bullish_confluence",
             "strength": len(bullish),
             "sources": bullish,
-            "message": f"{len(bullish)} señales ALCISTAS alineadas: {', '.join(bullish)}",
+            "message": f"{len(bullish)} BULLISH signals aligned: {', '.join(bullish)}",
         })
 
     if len(bearish) >= 3:
@@ -79,13 +79,13 @@ def detect_confluences() -> dict:
             "type": "bearish_confluence",
             "strength": len(bearish),
             "sources": bearish,
-            "message": f"{len(bearish)} señales BAJISTAS alineadas: {', '.join(bearish)}",
+            "message": f"{len(bearish)} BEARISH signals aligned: {', '.join(bearish)}",
         })
 
     if len(bullish) >= 2 and len(bearish) >= 2:
         confluences.append({
             "type": "divergence",
-            "message": f"SEÑALES MIXTAS: alcistas={', '.join(bullish)} vs bajistas={', '.join(bearish)}",
+            "message": f"MIXED SIGNALS: bullish={', '.join(bullish)} vs bearish={', '.join(bearish)}",
         })
 
     result = {
@@ -99,5 +99,5 @@ def detect_confluences() -> dict:
     for c in confluences:
         console.print(f"  [{c['type']}] {c['message']}")
 
-    console.print(f"[green]✅ Confluencias: {len(bullish)} alcistas, {len(bearish)} bajistas[/green]")
+    console.print(f"[green]Confluences: {len(bullish)} bullish, {len(bearish)} bearish[/green]")
     return result

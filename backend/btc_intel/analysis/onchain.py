@@ -1,4 +1,4 @@
-"""On-Chain Engine — Procesa y clasifica métricas on-chain."""
+"""On-Chain Engine — Process and classify on-chain metrics."""
 
 import numpy as np
 import pandas as pd
@@ -12,9 +12,9 @@ classifier = SignalClassifier()
 
 
 def analyze_onchain() -> int:
-    """Clasifica métricas on-chain y actualiza señales."""
+    """Classify on-chain metrics and update signals."""
     db = get_supabase()
-    console.print("[cyan]Analizando métricas on-chain...[/cyan]")
+    console.print("[cyan]Analyzing on-chain metrics...[/cyan]")
 
     updated = 0
 
@@ -83,5 +83,5 @@ def analyze_onchain() -> int:
                 db.table("onchain_metrics").upsert(rows[i:i+500], on_conflict="date,metric").execute()
                 updated += len(rows[i:i+500])
 
-    console.print(f"[green]✅ On-chain analysis: {updated} señales actualizadas[/green]")
+    console.print(f"[green]✅ On-chain analysis: {updated} signals updated[/green]")
     return updated

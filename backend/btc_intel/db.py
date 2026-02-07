@@ -18,7 +18,7 @@ def get_supabase() -> Client:
         if not settings.supabase_url or not settings.supabase_key:
             raise RuntimeError(
                 "Faltan SUPABASE_URL y/o SUPABASE_KEY en .env. "
-                "Revisa el archivo .env en la raíz del proyecto."
+                "Check the .env file in the project root."
             )
         _client = create_client(
             settings.supabase_url,

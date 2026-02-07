@@ -1,11 +1,10 @@
 """Backtesting — Store signal snapshots and evaluate past signals."""
 
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 
 from rich.console import Console
 
 from btc_intel.db import get_supabase
-from btc_intel.analysis.signal_classifier import SignalClassifier
 
 console = Console()
 
@@ -104,8 +103,11 @@ def store_signal_snapshot():
         elif pct > -5: signal_map["EMA_21"] = "bearish"
         else: signal_map["EMA_21"] = "extreme_bearish"
 
+    # Load v2 data (levels, fib, candle patterns) if available
+    v2_data = _load_v2_data(db, current_price)
+
     # Compute score for each timeframe
-    today = date.today().isoformat()
+    now = datetime.utcnow().isoformat()
     snapshots = 0
 
     for tf, weights in WEIGHTS.items():
@@ -121,13 +123,44 @@ def store_signal_snapshot():
         confidence = min(round(abs(total_score) * 100), 100)
 
         record = {
-            "date": today,
+            "date": now,
             "timeframe": tf,
             "direction": direction,
             "confidence": confidence,
             "score": round(total_score, 4),
             "price_at_signal": current_price,
         }
+
+        # Enrich with v2 data if available
+        if v2_data:
+            nearby = v2_data.get("nearby_levels", [])
+            record["nearby_levels"] = nearby[:10] if nearby else None
+            record["fib_context"] = v2_data.get("fib_context", {}).get(tf)
+
+            # Extended scoring
+            ext = v2_data.get("extended", {}).get(tf)
+            if ext:
+                record["level_score"] = ext.get("bonus_levels", 0)
+                record["candle_score"] = ext.get("bonus_candles", 0)
+                record["onchain_bonus"] = ext.get("bonus_onchain", 0)
+                record["penalties"] = ext.get("penalties", 0)
+                record["extended_score"] = ext.get("final_score")
+
+            # Setup info
+            setup = v2_data.get("setups", {}).get(tf)
+            if setup:
+                record["setup_type"] = setup.get("type")
+                record["candle_pattern"] = setup.get("candle_pattern")
+
+            # TP/SL
+            tpsl = v2_data.get("tpsl", {}).get(tf)
+            if tpsl and tpsl.get("valid"):
+                record["sl"] = tpsl["sl"]
+                record["tp1"] = tpsl["tp1"]
+                record["tp2"] = tpsl["tp2"]
+                record["sl_method"] = tpsl.get("sl_method", "")
+                record["tp1_method"] = tpsl.get("tp1_method", "")
+                record["tp2_method"] = tpsl.get("tp2_method", "")
 
         try:
             db.table("signal_history").upsert(
@@ -141,7 +174,12 @@ def store_signal_snapshot():
 
 
 def evaluate_past_signals():
-    """Evaluate past signals by comparing direction with actual price movement."""
+    """Evaluate past signals using TP/SL hits and price direction fallback.
+
+    If a signal has TP1/TP2/SL defined, evaluation checks which was hit first
+    by scanning hourly prices after the signal was created. Otherwise falls
+    back to simple price direction comparison.
+    """
     db = get_supabase()
 
     console.print("[bold]Signal Backtesting — Evaluation[/bold]")
@@ -150,7 +188,7 @@ def evaluate_past_signals():
     pending = (
         db.table("signal_history")
         .select("*")
-        .is_("outcome_1h", "null")
+        .is_("outcome", "null")
         .order("date", desc=False)
         .limit(200)
         .execute()
@@ -167,42 +205,66 @@ def evaluate_past_signals():
         direction = signal["direction"]
         price_at = float(signal["price_at_signal"])
 
-        # Get price at evaluation time
         eval_hours = EVAL_HOURS.get(tf, 24)
-        eval_date = str(date.fromisoformat(signal_date) + timedelta(hours=eval_hours))
 
-        later_price = (
+        # Parse signal date (now TIMESTAMPTZ format)
+        try:
+            signal_dt = datetime.fromisoformat(signal_date.replace("Z", "+00:00"))
+        except (ValueError, AttributeError):
+            try:
+                signal_dt = datetime.strptime(signal_date[:10], "%Y-%m-%d")
+            except (ValueError, AttributeError):
+                continue
+
+        eval_after = signal_dt + timedelta(hours=eval_hours)
+
+        # Check if enough time has passed
+        if datetime.utcnow() < eval_after:
+            continue
+
+        # Get prices between signal and evaluation window
+        prices_after = (
             db.table("btc_prices")
-            .select("close")
-            .gte("date", eval_date)
-            .order("date")
-            .limit(1)
+            .select("date,close,high,low")
+            .gte("date", signal_date[:10])
+            .lte("date", (eval_after + timedelta(days=1)).strftime("%Y-%m-%d"))
+            .order("date", desc=False)
             .execute()
         )
 
-        if not later_price.data:
-            continue  # Not enough time has passed
+        if not prices_after.data:
+            continue
 
-        price_later = float(later_price.data[0]["close"])
-        pct_change = ((price_later - price_at) / price_at) * 100
+        sl = signal.get("sl")
+        tp1 = signal.get("tp1")
+        tp2 = signal.get("tp2")
 
-        # Determine outcome
-        if direction == "LONG":
-            outcome = "correct" if pct_change > 0 else "incorrect"
-        elif direction == "SHORT":
-            outcome = "correct" if pct_change < 0 else "incorrect"
+        # TP/SL-based evaluation (v2)
+        if sl and tp1:
+            sl = float(sl)
+            tp1 = float(tp1)
+            tp2 = float(tp2) if tp2 else None
+
+            outcome, hit_at = _evaluate_tpsl(
+                direction, price_at, sl, tp1, tp2,
+                prices_after.data, signal_dt
+            )
         else:
-            outcome = "correct" if abs(pct_change) < 1 else "incorrect"
+            # Fallback: simple price direction
+            price_later = float(prices_after.data[-1]["close"])
+            pct_change = ((price_later - price_at) / price_at) * 100
 
-        # Map timeframe to column
-        col_price = f"price_{tf.lower()}_later"
-        col_outcome = f"outcome_{tf.lower()}"
+            if direction == "LONG":
+                outcome = "correct" if pct_change > 0 else "incorrect"
+            elif direction == "SHORT":
+                outcome = "correct" if pct_change < 0 else "incorrect"
+            else:
+                outcome = "correct" if abs(pct_change) < 1 else "incorrect"
+            hit_at = None
 
-        # Use 1h column for all since schema has fixed columns
-        update = {
-            "outcome_1h": outcome,
-            "price_1h_later": price_later,
-        }
+        update = {"outcome": outcome}
+        if hit_at:
+            update["hit_at"] = hit_at
 
         try:
             db.table("signal_history").update(update).eq("id", signal["id"]).execute()
@@ -211,3 +273,82 @@ def evaluate_past_signals():
             console.print(f"  [yellow]Error evaluating signal {signal['id']}: {e}[/yellow]")
 
     console.print(f"  [green]{evaluated} signals evaluated[/green]")
+
+
+def _evaluate_tpsl(
+    direction: str,
+    entry: float,
+    sl: float,
+    tp1: float,
+    tp2: float | None,
+    prices: list[dict],
+    signal_dt: datetime,
+) -> tuple[str, str | None]:
+    """Check which target (SL/TP1/TP2) was hit first.
+
+    Returns:
+        (outcome, hit_at_date)
+        outcome: "tp1_hit", "tp2_hit", "sl_hit", "pending"
+    """
+    tp1_hit = False
+
+    for row in prices:
+        high = float(row.get("high", row.get("close", 0)))
+        low = float(row.get("low", row.get("close", 0)))
+        row_date = row.get("date", "")
+
+        if direction == "LONG":
+            # SL hit: price went below SL
+            if low <= sl:
+                return "sl_hit", row_date
+            # TP2 hit (after TP1): price went above TP2
+            if tp2 and tp1_hit and high >= tp2:
+                return "tp2_hit", row_date
+            # TP1 hit: price went above TP1
+            if high >= tp1:
+                tp1_hit = True
+        else:  # SHORT
+            # SL hit: price went above SL
+            if high >= sl:
+                return "sl_hit", row_date
+            # TP2 hit (after TP1)
+            if tp2 and tp1_hit and low <= tp2:
+                return "tp2_hit", row_date
+            # TP1 hit
+            if low <= tp1:
+                tp1_hit = True
+
+    if tp1_hit:
+        return "tp1_hit", None
+
+    return "pending", None
+
+
+def _load_v2_data(db, current_price: float) -> dict | None:
+    """Load v2 trading data (levels, fib, confluences) for enriching snapshots."""
+    try:
+        # Load levels
+        levels_res = db.table("price_levels").select("price,type,strength,classification").order("strength", desc=True).limit(20).execute()
+        nearby_levels = [
+            {"price": r["price"], "type": r["type"], "strength": r["strength"], "class": r.get("classification")}
+            for r in (levels_res.data or [])
+        ]
+
+        # Load fib data per timeframe
+        fib_res = db.table("fibonacci_levels").select("timeframe,type,ratio,price,label").execute()
+        fib_context = {}
+        for row in (fib_res.data or []):
+            tf = row["timeframe"]
+            if tf not in fib_context:
+                fib_context[tf] = {"retracements": [], "extensions": []}
+            if row["type"] == "retracement":
+                fib_context[tf]["retracements"].append(row)
+            else:
+                fib_context[tf]["extensions"].append(row)
+
+        return {
+            "nearby_levels": nearby_levels,
+            "fib_context": fib_context,
+        }
+    except Exception:
+        return None

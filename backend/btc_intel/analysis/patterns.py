@@ -1,4 +1,4 @@
-"""Pattern Detection — Detecta patrones técnicos y genera alertas."""
+"""Pattern Detection — Detect technical patterns and generate alerts."""
 
 from datetime import date
 
@@ -73,7 +73,7 @@ def detect_patterns() -> int:
                          f"RSI(14) = {rsi_val:.1f}", "RSI_14", rsi_val, 30, "bullish")
             alerts_created += 1
 
-    console.print(f"[green]✅ Patterns: {alerts_created} alertas creadas[/green]")
+    console.print(f"[green]Patterns: {alerts_created} alerts created[/green]")
     return alerts_created
 
 
