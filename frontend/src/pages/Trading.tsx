@@ -114,6 +114,130 @@ function classificationBg(cls: string) {
   }
 }
 
+function StructuralAnalysis({ price, direction, rec, v2Data, htfDirection, t }: {
+  price: number; direction: string; rec: TradingRecommendation; v2Data: V2TradingData; htfDirection: string | null; t: (k: string) => string
+}) {
+  const levels = v2Data.priceLevels ?? []
+  const fibs = v2Data.fibLevels ?? []
+  const confluences = v2Data.confluences ?? []
+  const ema21 = rec.signals['EMA_21']?.rawValue ?? null
+  const fearGreed = rec.signals['FEAR_GREED']?.rawValue ?? null
+
+  type Item = { icon: string; text: string; color: string }
+  const levelItems: Item[] = []
+  const fibItems: Item[] = []
+  const penaltyItems: Item[] = []
+
+  // --- Level analysis ---
+  const near1pct = levels.filter(lv => Math.abs(price - lv.price) / (lv.price || 1) * 100 <= 1.0)
+
+  if (near1pct.some(lv => lv.strength >= 10)) {
+    const lv = near1pct.find(lv => lv.strength >= 10)!
+    levelItems.push({ icon: '✓', text: `${t('trading.strongLevel')} ${formatPrice(lv.price)} (str ${lv.strength}) → +8`, color: 'text-green-400' })
+  } else {
+    const sorted = [...levels].sort((a, b) => Math.abs(price - a.price) - Math.abs(price - b.price))
+    if (sorted.length > 0) {
+      const n = sorted[0]
+      const d = ((n.price - price) / price * 100)
+      levelItems.push({ icon: '✗', text: `${t('trading.nearestLevel')}: ${formatPrice(n.price)} (str ${n.strength}) a ${Math.abs(d).toFixed(1)}% — ${t('trading.outOfRange')} (1%)`, color: 'text-red-400/70' })
+    } else {
+      levelItems.push({ icon: '—', text: t('trading.noLevelsAvailable'), color: 'text-text-muted' })
+    }
+  }
+
+  if (near1pct.some(lv => lv.is_role_flip)) levelItems.push({ icon: '✓', text: `Role flip → +4`, color: 'text-green-400' })
+  if (near1pct.some(lv => lv.is_psychological)) levelItems.push({ icon: '✓', text: `${t('trading.psychLevel')} → +1`, color: 'text-green-400' })
+
+  // --- Fibonacci analysis ---
+  if (fibs.length === 0) {
+    fibItems.push({ icon: '—', text: t('trading.noFibData'), color: 'text-text-muted' })
+  } else {
+    let foundGP = false
+    let nearestFib: { r: number; p: number; d: number } | null = null
+
+    for (const fib of fibs) {
+      if (fib.type === 'extension') continue
+      const lvls = fib.levels as Record<string, number>
+      for (const [rs, fp] of Object.entries(lvls)) {
+        if (typeof fp !== 'number') continue
+        const r = parseFloat(rs), d = Math.abs(price - fp) / (fp || 1) * 100
+        if (d <= 1.0 && (Math.abs(r - 0.618) < 0.01 || Math.abs(r - 0.65) < 0.01)) {
+          foundGP = true
+          fibItems.push({ icon: '✓', text: `Golden Pocket (${r}) @ ${formatPrice(fp)} → +7`, color: 'text-green-400' })
+        }
+        if (!nearestFib || d < nearestFib.d) nearestFib = { r, p: fp, d }
+      }
+    }
+
+    if (!foundGP && nearestFib) {
+      fibItems.push({
+        icon: nearestFib.d <= 1.0 ? '~' : '✗',
+        text: `${t('trading.nearestFib')}: ${nearestFib.r.toFixed(3)} @ ${formatPrice(nearestFib.p)} (${nearestFib.d.toFixed(1)}%)`,
+        color: nearestFib.d <= 1.0 ? 'text-blue-400' : 'text-red-400/70',
+      })
+    }
+
+    // Confluence
+    const nearConf = confluences.filter(c => Math.abs(price - c.price_mid) / (c.price_mid || 1) * 100 <= 1.0 && c.num_timeframes >= 2)
+    if (nearConf.length > 0) {
+      fibItems.push({ icon: '✓', text: `${t('trading.confluenceZone')} ${formatPrice(nearConf[0].price_mid)} (${nearConf[0].num_timeframes} TF) → +6`, color: 'text-green-400' })
+    } else if (confluences.length > 0) {
+      const nc = [...confluences].sort((a, b) => Math.abs(price - a.price_mid) - Math.abs(price - b.price_mid))[0]
+      fibItems.push({ icon: '✗', text: `${t('trading.nearestConfluence')}: ${formatPrice(nc.price_mid)} (${nc.num_timeframes} TF) a ${(Math.abs(price - nc.price_mid) / (nc.price_mid || 1) * 100).toFixed(1)}%`, color: 'text-red-400/70' })
+    }
+  }
+
+  // --- Penalty reasons ---
+  const strong2pct = levels.filter(lv => lv.strength >= 6 && Math.abs(price - lv.price) / (lv.price || 1) * 100 <= 2.0)
+  if (strong2pct.length === 0) penaltyItems.push({ icon: '✗', text: `${t('trading.penNoLevels')}: -5`, color: 'text-red-400' })
+  if (htfDirection && htfDirection !== direction && htfDirection !== 'NEUTRAL') penaltyItems.push({ icon: '✗', text: `${t('trading.penAgainstHTF')} (${htfDirection}): -8`, color: 'text-red-400' })
+  if (ema21 && ema21 > 0) {
+    const dp = Math.abs(price - ema21) / ema21 * 100
+    if (dp > 5) penaltyItems.push({ icon: '✗', text: `${t('trading.penOverextended')} (${dp.toFixed(1)}%): -5`, color: 'text-red-400' })
+  }
+  if (fearGreed != null) {
+    if (direction === 'LONG' && fearGreed > 85) penaltyItems.push({ icon: '✗', text: `Long en ${t('trading.penEuphoria')} (F&G: ${fearGreed}): -5`, color: 'text-red-400' })
+    if (direction === 'SHORT' && fearGreed < 15) penaltyItems.push({ icon: '✗', text: `Short en ${t('trading.penExtremeFear')} (F&G: ${fearGreed}): -5`, color: 'text-red-400' })
+  }
+
+  return (
+    <div className="mt-3 space-y-2.5 text-[10px]">
+      <div>
+        <span className="font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1 mb-1">
+          <Layers className="w-3 h-3" /> {t('trading.srLevels')}
+        </span>
+        {levelItems.map((it, i) => (
+          <p key={i} className="text-text-secondary leading-relaxed flex items-start gap-1.5 ml-4">
+            <span className={cn('font-mono font-bold shrink-0', it.color)}>{it.icon}</span> {it.text}
+          </p>
+        ))}
+      </div>
+      <div>
+        <span className="font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1 mb-1">
+          <TrendingUp className="w-3 h-3" /> Fibonacci
+        </span>
+        {fibItems.map((it, i) => (
+          <p key={i} className="text-text-secondary leading-relaxed flex items-start gap-1.5 ml-4">
+            <span className={cn('font-mono font-bold shrink-0', it.color)}>{it.icon}</span> {it.text}
+          </p>
+        ))}
+      </div>
+      {penaltyItems.length > 0 && (
+        <div>
+          <span className="font-semibold text-red-400/80 uppercase tracking-wider flex items-center gap-1 mb-1">
+            <ShieldAlert className="w-3 h-3" /> {t('trading.penaltyReasons')}
+          </span>
+          {penaltyItems.map((it, i) => (
+            <p key={i} className="text-red-400/70 leading-relaxed flex items-start gap-1.5 ml-4">
+              <span className="font-mono font-bold shrink-0">{it.icon}</span> {it.text}
+            </p>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function DirectionIcon({ direction, className }: { direction: string; className?: string }) {
   if (direction === 'LONG') return <ArrowUp className={className || 'w-5 h-5'} />
   if (direction === 'SHORT') return <ArrowDown className={className || 'w-5 h-5'} />
@@ -372,7 +496,7 @@ function TradingThesis({ rec, price, t }: { rec: TradingRecommendation; price: n
   )
 }
 
-function TimeframeDetail({ rec, price, t }: { rec: TradingRecommendation; price: number; t: (k: string) => string }) {
+function TimeframeDetail({ rec, price, t, v2Data, htfDirection }: { rec: TradingRecommendation; price: number; t: (k: string) => string; v2Data?: V2TradingData; htfDirection?: string | null }) {
   const entries = Object.entries(rec.signals).sort((a, b) => Math.abs(b[1].contribution) - Math.abs(a[1].contribution))
   const maxAbs = entries.reduce((max, [, d]) => Math.max(max, Math.abs(d.contribution)), 0)
   const totalSignals = rec.bullishCount + rec.bearishCount + rec.neutralCount
@@ -410,7 +534,7 @@ function TimeframeDetail({ rec, price, t }: { rec: TradingRecommendation; price:
       </div>
 
       {/* v2: Extended Score Breakdown */}
-      {rec.direction !== 'NEUTRAL' && (rec.bonusLevels > 0 || rec.bonusCandles > 0 || rec.bonusOnchain > 0 || rec.penalties < 0 || rec.setupType || rec.candlePattern) && (
+      {rec.direction !== 'NEUTRAL' && (
         <div className="px-4 py-3 border-b border-border/50 bg-gradient-to-r from-accent-btc/5 to-transparent">
           <div className="flex items-center gap-2 mb-2">
             <Zap className="w-3.5 h-3.5 text-accent-btc" />
@@ -428,8 +552,13 @@ function TimeframeDetail({ rec, price, t }: { rec: TradingRecommendation; price:
             <span className={cn('font-bold', classificationColor(rec.classification))}>{rec.extendedScore}%</span>
           </div>
 
+          {/* Structural Analysis */}
+          {v2Data && (
+            <StructuralAnalysis price={price} direction={rec.direction} rec={rec} v2Data={v2Data} htfDirection={htfDirection ?? null} t={t} />
+          )}
+
           {/* Setup type and candle pattern badges */}
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap mt-2">
             {rec.setupType && (
               <span className="text-[9px] px-2 py-0.5 rounded-full bg-accent-btc/15 text-accent-btc border border-accent-btc/30 font-semibold flex items-center gap-1">
                 <TrendingUp className="w-2.5 h-2.5" />
@@ -789,9 +918,12 @@ export default function Trading() {
 
       {/* Detailed breakdown per timeframe */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {recommendations.map((rec) => (
-          <TimeframeDetail key={rec.timeframe} rec={rec} price={currentPrice} t={t} />
-        ))}
+        {recommendations.map((rec) => {
+          const htfMap: Record<string, string> = { '1H': '4H', '4H': '1D', '1D': '1W' }
+          const htfTf = htfMap[rec.timeframe]
+          const htfDir = htfTf ? recommendations.find(r => r.timeframe === htfTf)?.direction ?? null : null
+          return <TimeframeDetail key={rec.timeframe} rec={rec} price={currentPrice} t={t} v2Data={v2Data} htfDirection={htfDir} />
+        })}
       </div>
 
       {/* Signal Accuracy */}

@@ -1,16 +1,24 @@
 import { useMemo, useState, useCallback } from 'react'
-import { Line, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, ComposedChart, Bar, ReferenceLine, ReferenceDot } from 'recharts'
 import { SignalBadge } from '../components/common/MetricCard'
 import { CardSkeleton } from '../components/common/LoadingSkeleton'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
 import HelpButton from '../components/common/HelpButton'
 import ChartContainer from '../components/common/ChartContainer'
+import CandlestickChart from '../components/technical/CandlestickChart'
+import RsiChart from '../components/technical/RsiChart'
+import MacdChart from '../components/technical/MacdChart'
+import LevelMap from '../components/technical/LevelMap'
+import ConfluenceCards from '../components/technical/ConfluenceCards'
+import ReturnHeatmap from '../components/technical/ReturnHeatmap'
+import TechnicalInterpretation from '../components/technical/TechnicalInterpretation'
+import OverlayControls, { useOverlays } from '../components/technical/OverlayControls'
 import { useIndicatorHistory, useLatestSignals } from '../hooks/useTechnical'
 import { usePriceHistory } from '../hooks/usePrices'
-import { formatPrice } from '../lib/utils'
+import { usePriceLevels, useFibonacciLevels, useConfluenceZones } from '../hooks/useLevels'
 import { useI18n } from '../lib/i18n'
 
+/* ── Helpers ──────────────────────────────────────────────────── */
 const RANGE_DAYS: Record<string, number> = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, ALL: 9999 }
 
 function sliceByRange<T>(data: T[], range: string): T[] {
@@ -25,9 +33,13 @@ function fmtDate(iso: string): string {
   return `${d}/${m}/${y}`
 }
 
+/* ── Main page ────────────────────────────────────────────────── */
 export default function Technical() {
   const { t, ta } = useI18n()
   const [range, setRange] = useState('1Y')
+  const { overlays, toggle } = useOverlays()
+
+  /* ── Data hooks ─────────────────────────────────────────────── */
   const { data: rsiData, loading } = useIndicatorHistory('RSI_14', 3000)
   const { data: macdData } = useIndicatorHistory('MACD', 3000)
   const { data: macdSignalData } = useIndicatorHistory('MACD_SIGNAL', 3000)
@@ -37,9 +49,16 @@ export default function Technical() {
   const { data: ema21Data } = useIndicatorHistory('EMA_21', 3000)
   const { data: sma50Data } = useIndicatorHistory('SMA_50', 3000)
   const { data: sma200Data } = useIndicatorHistory('SMA_200', 3000)
+  const { data: bbUpperData } = useIndicatorHistory('BB_UPPER', 3000)
+  const { data: bbMidData } = useIndicatorHistory('BB_MID', 3000)
+  const { data: bbLowerData } = useIndicatorHistory('BB_LOWER', 3000)
+  const { data: levels } = usePriceLevels(0)
+  const { data: fibLevels } = useFibonacciLevels()
+  const { data: confluenceZones } = useConfluenceZones()
 
   const handleRange = useCallback((r: string) => setRange(r), [])
 
+  /* ── Format helpers ─────────────────────────────────────────── */
   const formatAxisDate = useCallback((iso: string) => {
     if (!iso || !iso.includes('-')) return iso || ''
     const [y, m, d] = iso.split('-')
@@ -48,17 +67,23 @@ export default function Technical() {
   }, [range])
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formatTooltipLabel = useCallback((label: any) => {
-    if (!label) return ''
-    return fmtDate(String(label))
-  }, [])
+  const formatTooltipLabel = useCallback((label: any) => (label ? fmtDate(String(label)) : ''), [])
 
-  // Build full datasets (reversed = chronological)
+  /* ── Indicator maps ─────────────────────────────────────────── */
+  const ema21Map = useMemo(() => new Map(ema21Data?.map((d) => [d.date, d.value]) || []), [ema21Data])
+  const sma50Map = useMemo(() => new Map(sma50Data?.map((d) => [d.date, d.value]) || []), [sma50Data])
+  const sma200Map = useMemo(() => new Map(sma200Data?.map((d) => [d.date, d.value]) || []), [sma200Data])
+  const bbUpperMap = useMemo(() => new Map(bbUpperData?.map((d) => [d.date, d.value]) || []), [bbUpperData])
+  const bbMidMap = useMemo(() => new Map(bbMidData?.map((d) => [d.date, d.value]) || []), [bbMidData])
+  const bbLowerMap = useMemo(() => new Map(bbLowerData?.map((d) => [d.date, d.value]) || []), [bbLowerData])
+
+  /* ── RSI data ───────────────────────────────────────────────── */
   const fullRsi = useMemo(() => {
     if (!rsiData) return []
     return [...rsiData].reverse().map((d) => ({ date: d.date, value: d.value, signal: d.signal }))
   }, [rsiData])
 
+  /* ── MACD data + crossovers ─────────────────────────────────── */
   const fullMacd = useMemo(() => {
     if (!macdData) return []
     const signalMap = new Map(macdSignalData?.map((d) => [d.date, d.value]) || [])
@@ -68,30 +93,12 @@ export default function Technical() {
       macd: d.value,
       signal_line: signalMap.get(d.date) ?? null,
       histogram: histMap.get(d.date) ?? null,
-      sig: d.signal,
     }))
   }, [macdData, macdSignalData, macdHistData])
 
-  const fullPrice = useMemo(() => {
-    if (!prices) return []
-    const ema21Map = new Map(ema21Data?.map((d) => [d.date, d.value]) || [])
-    const sma50Map = new Map(sma50Data?.map((d) => [d.date, d.value]) || [])
-    const sma200Map = new Map(sma200Data?.map((d) => [d.date, d.value]) || [])
-    return [...prices].reverse().map((p) => ({
-      date: p.date,
-      price: p.close,
-      ema21: ema21Map.get(p.date) ?? null,
-      sma50: sma50Map.get(p.date) ?? null,
-      sma200: sma200Map.get(p.date) ?? null,
-    }))
-  }, [prices, ema21Data, sma50Data, sma200Data])
-
-  // Apply time range filter
-  const rsiChart = useMemo(() => sliceByRange(fullRsi, range), [fullRsi, range])
   const macdChart = useMemo(() => sliceByRange(fullMacd, range), [fullMacd, range])
-  const priceChart = useMemo(() => sliceByRange(fullPrice, range), [fullPrice, range])
+  const rsiChart = useMemo(() => sliceByRange(fullRsi, range), [fullRsi, range])
 
-  // Detect MACD crossovers
   const crosses = useMemo(() => {
     const pts: { date: string; macd: number; type: 'bullish' | 'bearish' }[] = []
     for (let i = 1; i < macdChart.length; i++) {
@@ -107,76 +114,64 @@ export default function Technical() {
     return pts
   }, [macdChart])
 
-  // Technical interpretation
-  const insights = useMemo(() => {
-    const result: { type: 'bullish' | 'bearish' | 'neutral'; text: string }[] = []
-    if (!rsiChart.length) return result
-    const latestRsi = rsiChart[rsiChart.length - 1]
-    if (latestRsi) {
-      if (latestRsi.value > 70) result.push({ type: 'bearish', text: `RSI en sobrecompra (${latestRsi.value.toFixed(1)}): ${t('technical.rsiOverbought')}` })
-      else if (latestRsi.value < 30) result.push({ type: 'bullish', text: `RSI en sobreventa (${latestRsi.value.toFixed(1)}): ${t('technical.rsiOversold')}` })
-      else if (latestRsi.value > 50) result.push({ type: 'bullish', text: `RSI en zona alcista (${latestRsi.value.toFixed(1)}): ${t('technical.rsiBullZone')}` })
-      else result.push({ type: 'bearish', text: `RSI en zona bajista (${latestRsi.value.toFixed(1)}): ${t('technical.rsiBearZone')}` })
-    }
-    if (macdChart.length) {
-      const latestMacd = macdChart[macdChart.length - 1]
-      if (latestMacd.histogram != null) {
-        if (latestMacd.histogram > 0) result.push({ type: 'bullish', text: `MACD histograma positivo (${latestMacd.histogram.toFixed(2)}): ${t('technical.macdPosBullish')}` })
-        else result.push({ type: 'bearish', text: `MACD histograma negativo (${latestMacd.histogram.toFixed(2)}): ${t('technical.macdNegBearish')}` })
-      }
-      if (crosses.length) {
-        const lastCross = crosses[crosses.length - 1]
-        result.push({
-          type: lastCross.type,
-          text: `${t('technical.lastMacdCross')} ${lastCross.type === 'bullish' ? t('technical.bullishMacdCross') : t('technical.bearishMacdCross')} en ${fmtDate(lastCross.date)}`,
-        })
-      }
-    }
-    // MA proximity insights
-    if (priceChart.length) {
-      const latest = priceChart[priceChart.length - 1]
-      if (latest.ema21 && latest.price) {
-        const pctFromEma = ((latest.price - latest.ema21) / latest.ema21) * 100
-        if (Math.abs(pctFromEma) < 2) {
-          result.push({ type: 'neutral', text: `Precio cerca de EMA 21 (${formatPrice(latest.ema21)}): ${t('technical.priceNearEma')}` })
-        } else if (pctFromEma > 0) {
-          result.push({ type: 'bullish', text: `Precio ${pctFromEma.toFixed(1)}% ${t('technical.priceAboveEma')} (${formatPrice(latest.ema21)})` })
-        } else {
-          result.push({ type: 'bearish', text: `Precio ${Math.abs(pctFromEma).toFixed(1)}% ${t('technical.priceBelowEma')} (${formatPrice(latest.ema21)})` })
-        }
-      }
-      if (latest.sma50 && latest.sma200) {
-        if (latest.sma50 > latest.sma200) {
-          result.push({ type: 'bullish', text: `SMA 50 (${formatPrice(latest.sma50)}) ${t('technical.smaAbove')} (${formatPrice(latest.sma200)}): ${t('technical.structureBullish')}` })
-        } else {
-          result.push({ type: 'bearish', text: `SMA 50 (${formatPrice(latest.sma50)}) ${t('technical.smaBelow')} (${formatPrice(latest.sma200)}): ${t('technical.structureBearish')}` })
-        }
-      }
-    }
-    const smaSignal = signals?.find((s) => s.indicator === 'SMA_CROSS')
-    if (smaSignal) {
-      result.push({
-        type: smaSignal.signal === 'bullish' ? 'bullish' : smaSignal.signal === 'bearish' ? 'bearish' : 'neutral',
-        text: smaSignal.signal === 'bullish' ? t('technical.goldenCross') : smaSignal.signal === 'bearish' ? t('technical.deathCross') : t('technical.smaConverging'),
-      })
-    }
-    return result
-  }, [rsiChart, macdChart, crosses, signals, priceChart, t])
+  /* ── Price data for range-filtered charts ───────────────────── */
+  const filteredPrices = useMemo(() => {
+    if (!prices) return []
+    const days = RANGE_DAYS[range] || 365
+    const reversed = [...prices].reverse()
+    return days >= reversed.length ? reversed : reversed.slice(-days)
+  }, [prices, range])
 
-  if (loading) return <div className="p-6"><PageHeader title={t('technical.title')} /><div className="grid grid-cols-2 gap-4">{Array.from({length:4}).map((_,i)=><CardSkeleton key={i}/>)}</div></div>
+  /* ── Current price ──────────────────────────────────────────── */
+  const currentPrice = useMemo(() => {
+    if (!prices?.length) return 0
+    return prices[0].close
+  }, [prices])
 
-  if (!rsiData?.length) return <div className="p-6"><PageHeader title={t('technical.title')} /><EmptyState command="btc-intel analyze technical" /></div>
+  /* ── Interpretation data ────────────────────────────────────── */
+  const rsiLatest = useMemo(() => (rsiChart.length ? rsiChart[rsiChart.length - 1] : null), [rsiChart])
+  const macdLatest = useMemo(() => (macdChart.length ? macdChart[macdChart.length - 1] : null), [macdChart])
+  const lastCross = useMemo(() => (crosses.length ? crosses[crosses.length - 1] : null), [crosses])
+  const priceLatest = useMemo(() => {
+    if (!filteredPrices.length) return null
+    const p = filteredPrices[filteredPrices.length - 1]
+    return {
+      price: p.close,
+      ema21: ema21Map.get(p.date) ?? null,
+      sma50: sma50Map.get(p.date) ?? null,
+      sma200: sma200Map.get(p.date) ?? null,
+    }
+  }, [filteredPrices, ema21Map, sma50Map, sma200Map])
+  const smaSignal = useMemo(() => signals?.find((s) => s.indicator === 'SMA_CROSS')?.signal ?? null, [signals])
+
+  /* ── Loading / Empty states ─────────────────────────────────── */
+  if (loading) {
+    return (
+      <div className="p-6">
+        <PageHeader title={t('technical.title')} />
+        <div className="grid grid-cols-2 gap-4">
+          {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
+        </div>
+      </div>
+    )
+  }
+
+  if (!rsiData?.length) {
+    return (
+      <div className="p-6">
+        <PageHeader title={t('technical.title')} />
+        <EmptyState command="btc-intel analyze technical" />
+      </div>
+    )
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-4 md:space-y-6">
       <PageHeader title={t('technical.title')} subtitle={t('technical.subtitle')}>
-        <HelpButton
-          title={t('technical.helpTitle')}
-          content={ta('technical')}
-        />
+        <HelpButton title={t('technical.helpTitle')} content={ta('technical')} />
       </PageHeader>
 
-      {/* Latest Signals */}
+      {/* ── Signal chips ──────────────────────────────────────── */}
       {signals && signals.length > 0 && (
         <div className="flex flex-wrap gap-3">
           {signals.map((s, i) => (
@@ -189,115 +184,80 @@ export default function Technical() {
         </div>
       )}
 
-      {/* Price Chart with Moving Averages */}
-      <ChartContainer title={t('technical.priceMA')} activeRange={range} onTimeRangeChange={handleRange}>
-        <div className="h-72">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={priceChart}>
-              <defs>
-                <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f7931a" stopOpacity={0.3} />
-                  <stop offset="95%" stopColor="#f7931a" stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={formatAxisDate} />
-              <YAxis domain={[(min: number) => min * 0.98, (max: number) => max * 1.02]} tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => `$${(v/1000).toFixed(0)}k`} />
-              <Tooltip
-                contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }}
-                labelFormatter={formatTooltipLabel}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={(v: any, name: any) => {
-                  if (v == null) return ['—', name]
-                  const label = name === 'price' ? 'BTC' : name === 'ema21' ? 'EMA 21' : name === 'sma50' ? 'SMA 50' : name === 'sma200' ? 'SMA 200' : name
-                  return [formatPrice(Number(v)), label]
-                }}
-              />
-              <Area type="monotone" dataKey="price" stroke="#f7931a" fill="url(#priceGrad)" strokeWidth={2} />
-              <Line type="monotone" dataKey="ema21" stroke="#06b6d4" strokeWidth={1.5} dot={false} connectNulls />
-              <Line type="monotone" dataKey="sma50" stroke="#a855f7" strokeWidth={1.5} dot={false} connectNulls />
-              <Line type="monotone" dataKey="sma200" stroke="#ef4444" strokeWidth={1.5} dot={false} connectNulls />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex flex-wrap gap-4 mt-2 text-xs text-text-muted">
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#f7931a] inline-block" /> {t('overview.btcPrice')}</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#06b6d4] inline-block" /> EMA 21</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#a855f7] inline-block" /> SMA 50</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#ef4444] inline-block" /> SMA 200</span>
-        </div>
+      {/* ── Controls ──────────────────────────────────────────── */}
+      <div className="rounded-xl bg-bg-secondary/60 border border-border p-3 backdrop-blur-sm">
+        <OverlayControls overlays={overlays} onToggle={toggle} />
+      </div>
+
+      {/* ── Candlestick Chart ─────────────────────────────────── */}
+      <ChartContainer title={t('technical.candlestick')} activeRange={range} onTimeRangeChange={handleRange}>
+        <CandlestickChart
+          prices={prices ? [...prices] : []}
+          ema21Map={ema21Map}
+          sma50Map={sma50Map}
+          sma200Map={sma200Map}
+          bbUpperMap={bbUpperMap}
+          bbMidMap={bbMidMap}
+          bbLowerMap={bbLowerMap}
+          levels={levels || []}
+          fibLevels={fibLevels || []}
+          confluenceZones={confluenceZones || []}
+          overlays={overlays}
+          range={range}
+          formatAxisDate={formatAxisDate}
+          formatTooltipLabel={formatTooltipLabel}
+        />
       </ChartContainer>
 
-      {/* RSI Chart */}
+      {/* ── RSI Chart ─────────────────────────────────────────── */}
       <ChartContainer title={t('technical.rsi')} activeRange={range} onTimeRangeChange={handleRange}>
-        <div className="h-48">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={rsiChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={formatAxisDate} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#6b7280' }} />
-              <Tooltip contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }} labelFormatter={formatTooltipLabel} />
-              <ReferenceLine y={70} stroke="#ef4444" strokeDasharray="3 3" label={{ value: '70', position: 'right', fill: '#ef4444', fontSize: 10 }} />
-              <ReferenceLine y={30} stroke="#22c55e" strokeDasharray="3 3" label={{ value: '30', position: 'right', fill: '#22c55e', fontSize: 10 }} />
-              <Line type="monotone" dataKey="value" stroke="#8b5cf6" strokeWidth={2} dot={false} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+        <RsiChart
+          data={rsiChart}
+          formatAxisDate={formatAxisDate}
+          formatTooltipLabel={formatTooltipLabel}
+        />
       </ChartContainer>
 
-      {/* MACD Chart */}
+      {/* ── MACD Chart ────────────────────────────────────────── */}
       <ChartContainer title={t('technical.macd')} activeRange={range} onTimeRangeChange={handleRange}>
-        <div className="h-56">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={macdChart}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#2a2a3e" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={formatAxisDate} />
-              <YAxis tick={{ fontSize: 10, fill: '#6b7280' }} />
-              <Tooltip
-                contentStyle={{ background: '#12121a', border: '1px solid #2a2a3e', borderRadius: 8 }}
-                labelFormatter={formatTooltipLabel}
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                formatter={(v: any, name: any) => [v != null ? Number(v).toFixed(2) : '—', name === 'macd' ? 'MACD' : name === 'signal_line' ? 'Signal' : 'Histogram']}
-              />
-              <ReferenceLine y={0} stroke="#4b5563" />
-              <Bar dataKey="histogram" fill="#6b7280" opacity={0.5} />
-              <Line type="monotone" dataKey="macd" stroke="#f7931a" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="signal_line" stroke="#3b82f6" strokeWidth={1.5} dot={false} strokeDasharray="4 2" />
-              {crosses.map((c, i) => (
-                <ReferenceDot
-                  key={i}
-                  x={c.date}
-                  y={c.macd}
-                  r={4}
-                  fill={c.type === 'bullish' ? '#22c55e' : '#ef4444'}
-                  stroke="none"
-                />
-              ))}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex gap-4 mt-2 text-xs text-text-muted">
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#f7931a] inline-block" /> MACD</span>
-          <span className="flex items-center gap-1"><span className="w-3 h-0.5 bg-[#3b82f6] inline-block border-dashed" /> Signal</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-bullish inline-block" /> {t('technical.bullishCross')}</span>
-          <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-bearish inline-block" /> {t('technical.bearishCross')}</span>
-        </div>
+        <MacdChart
+          data={macdChart}
+          crosses={crosses}
+          formatAxisDate={formatAxisDate}
+          formatTooltipLabel={formatTooltipLabel}
+        />
       </ChartContainer>
 
-      {/* Interpretation */}
-      {insights.length > 0 && (
-        <div className="rounded-xl bg-gradient-to-br from-accent-purple/10 to-accent-btc/10 border border-accent-purple/30 p-4 md:p-6 backdrop-blur-sm">
-          <h3 className="font-display font-semibold mb-3">{t('common.interpretation')}</h3>
-          <div className="space-y-2">
-            {insights.map((insight, i) => (
-              <div key={i} className="flex items-start gap-2">
-                <span className={`mt-1 w-2 h-2 rounded-full shrink-0 ${insight.type === 'bullish' ? 'bg-bullish' : insight.type === 'bearish' ? 'bg-bearish' : 'bg-neutral-signal'}`} />
-                <p className="text-sm text-text-secondary">{insight.text}</p>
-              </div>
-            ))}
-          </div>
+      {/* ── Level Map + Confluence — side by side ─────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
+          <h3 className="font-display font-semibold mb-3">{t('technical.levelMap')}</h3>
+          <LevelMap levels={levels || []} currentPrice={currentPrice} />
         </div>
-      )}
+        <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
+          <h3 className="font-display font-semibold mb-3">{t('technical.confluenceZones')}</h3>
+          <ConfluenceCards zones={confluenceZones || []} currentPrice={currentPrice} />
+        </div>
+      </div>
+
+      {/* ── Return Heatmap ────────────────────────────────────── */}
+      <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
+        <h3 className="font-display font-semibold mb-3">{t('technical.returnHeatmap')}</h3>
+        <ReturnHeatmap prices={prices || []} />
+      </div>
+
+      {/* ── Extended Interpretation ────────────────────────────── */}
+      <TechnicalInterpretation
+        rsiLatest={rsiLatest}
+        macdLatest={macdLatest}
+        lastCross={lastCross}
+        priceLatest={priceLatest}
+        levels={levels || []}
+        fibLevels={fibLevels || []}
+        confluenceZones={confluenceZones || []}
+        prices={prices || []}
+        smaSignal={smaSignal}
+      />
     </div>
   )
 }
