@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { ArrowUp, ArrowDown, Minus, Info, Target, ShieldAlert, Bitcoin, BarChart3, Layers } from 'lucide-react'
+import { ArrowUp, ArrowDown, Minus, Info, Target, ShieldAlert, Bitcoin, BarChart3, Layers, TrendingUp, Zap, Activity } from 'lucide-react'
 import { SignalBadge } from '../components/common/MetricCard'
 import { CardSkeleton } from '../components/common/LoadingSkeleton'
 import EmptyState from '../components/common/EmptyState'
@@ -8,10 +8,10 @@ import HelpButton from '../components/common/HelpButton'
 import { usePriceChanges } from '../hooks/usePrices'
 import { useLatestCycleScore } from '../hooks/useCycleScore'
 import { useLatestSignals, useLatestIndicators, useTradingRecommendations, SIGNAL_LABELS } from '../hooks/useTechnical'
-import type { TradingRecommendation, SignalDetail, TradingLevels } from '../hooks/useTechnical'
+import type { TradingRecommendation, SignalDetail, TradingLevels, V2TradingData } from '../hooks/useTechnical'
 import { useLatestSentiment } from '../hooks/useSentiment'
-import { useSignalAccuracy } from '../hooks/useSignalHistory'
-import { usePriceLevels } from '../hooks/useLevels'
+import { useSignalAccuracy, useSignalHistory } from '../hooks/useSignalHistory'
+import { usePriceLevels, useFibonacciLevels, useConfluenceZones } from '../hooks/useLevels'
 import { useSupabaseQuery, supabase } from '../hooks/useSupabase'
 import type { OnchainMetric, PriceLevel as PriceLevelType } from '../lib/types'
 import { formatPrice, formatPercent, cn } from '../lib/utils'
@@ -65,6 +65,16 @@ function signalExplanation(key: string, detail: SignalDetail, t: (k: string) => 
       if (detail.score > 0) return `Cycle Score en ${val} — ${t('sig.cs.bullish')}`
       if (detail.score < 0) return `Cycle Score en ${val} — ${t('sig.cs.bearish')}`
       return `Cycle Score en ${val} — ${t('sig.cs.neutral')}`
+    case 'FUNDING_RATE': {
+      const pct = detail.rawValue != null ? (detail.rawValue * 100).toFixed(4) : '?'
+      if (detail.score > 0) return `Funding Rate en ${pct}% — ${t('sig.fr.bullish')}`
+      if (detail.score < 0) return `Funding Rate en ${pct}% — ${t('sig.fr.bearish')}`
+      return `Funding Rate en ${pct}% — ${t('sig.fr.neutral')}`
+    }
+    case 'OPEN_INTEREST':
+      if (detail.score > 0) return `Open Interest — ${t('sig.oi.bullish')}`
+      if (detail.score < 0) return `Open Interest — ${t('sig.oi.bearish')}`
+      return `Open Interest — ${t('sig.oi.neutral')}`
     default:
       return `${label}: ${val} (${dir})`
   }
@@ -80,6 +90,28 @@ function directionBg(dir: string) {
   if (dir === 'LONG') return 'bg-bullish/10 border-bullish/20'
   if (dir === 'SHORT') return 'bg-bearish/10 border-bearish/20'
   return 'bg-neutral-signal/10 border-neutral-signal/20'
+}
+
+function classificationColor(cls: string) {
+  switch (cls) {
+    case 'PREMIUM': return 'text-yellow-400'
+    case 'STRONG': return 'text-green-400'
+    case 'VALID': return 'text-blue-400'
+    case 'WEAK': return 'text-orange-400'
+    case 'REJECTED': return 'text-red-400'
+    default: return 'text-text-muted'
+  }
+}
+
+function classificationBg(cls: string) {
+  switch (cls) {
+    case 'PREMIUM': return 'bg-yellow-400/15 border-yellow-400/30 text-yellow-400'
+    case 'STRONG': return 'bg-green-400/15 border-green-400/30 text-green-400'
+    case 'VALID': return 'bg-blue-400/15 border-blue-400/30 text-blue-400'
+    case 'WEAK': return 'bg-orange-400/15 border-orange-400/30 text-orange-400'
+    case 'REJECTED': return 'bg-red-400/15 border-red-400/30 text-red-400'
+    default: return 'bg-bg-tertiary border-border text-text-muted'
+  }
 }
 
 function DirectionIcon({ direction, className }: { direction: string; className?: string }) {
@@ -358,8 +390,12 @@ function TimeframeDetail({ rec, price, t }: { rec: TradingRecommendation; price:
           <span className="text-xs text-text-secondary hidden sm:block">{t(`trading.${rec.timeframe}`)}</span>
         </div>
         <div className="text-right">
-          <span className={cn('font-mono text-lg font-bold', directionColor(rec.direction))}>{rec.confidence}%</span>
-          <span className="text-[10px] text-text-muted block">{t('trading.confidence')}</span>
+          <span className={cn('font-mono text-lg font-bold', directionColor(rec.direction))}>{rec.extendedScore}%</span>
+          <div className="flex items-center gap-1.5 justify-end mt-0.5">
+            <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border', classificationBg(rec.classification))}>
+              {rec.classification}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -372,6 +408,43 @@ function TimeframeDetail({ rec, price, t }: { rec: TradingRecommendation; price:
         {rec.bearishCount > 0 && <span className="text-bearish font-mono">{rec.bearishCount} {t('trading.bearish')}</span>}
         {rec.neutralCount > 0 && <span className="text-neutral-signal font-mono">{rec.neutralCount} {t('trading.neutral')}</span>}
       </div>
+
+      {/* v2: Extended Score Breakdown */}
+      {rec.direction !== 'NEUTRAL' && (rec.bonusLevels > 0 || rec.bonusCandles > 0 || rec.bonusOnchain > 0 || rec.penalties < 0 || rec.setupType || rec.candlePattern) && (
+        <div className="px-4 py-3 border-b border-border/50 bg-gradient-to-r from-accent-btc/5 to-transparent">
+          <div className="flex items-center gap-2 mb-2">
+            <Zap className="w-3.5 h-3.5 text-accent-btc" />
+            <span className="text-[10px] font-display font-semibold text-text-secondary uppercase tracking-wider">{t('trading.extendedScore')}</span>
+          </div>
+
+          {/* Score breakdown bar */}
+          <div className="flex items-center gap-1.5 text-[10px] font-mono flex-wrap mb-2">
+            <span className="text-text-muted">{t('trading.baseScore')}: {rec.confidence}</span>
+            {rec.bonusLevels > 0 && <span className="text-green-400">+{rec.bonusLevels} {t('trading.bonusLevels')}</span>}
+            {rec.bonusCandles > 0 && <span className="text-blue-400">+{rec.bonusCandles} {t('trading.bonusCandles')}</span>}
+            {rec.bonusOnchain > 0 && <span className="text-purple-400">+{rec.bonusOnchain} {t('trading.bonusOnchain')}</span>}
+            {rec.penalties < 0 && <span className="text-red-400">{rec.penalties} {t('trading.penaltiesLabel')}</span>}
+            <span className="text-text-muted">=</span>
+            <span className={cn('font-bold', classificationColor(rec.classification))}>{rec.extendedScore}%</span>
+          </div>
+
+          {/* Setup type and candle pattern badges */}
+          <div className="flex gap-2 flex-wrap">
+            {rec.setupType && (
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-accent-btc/15 text-accent-btc border border-accent-btc/30 font-semibold flex items-center gap-1">
+                <TrendingUp className="w-2.5 h-2.5" />
+                {rec.setupType}
+              </span>
+            )}
+            {rec.candlePattern && (
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-purple-400/15 text-purple-400 border border-purple-400/30 font-semibold flex items-center gap-1">
+                <Activity className="w-2.5 h-2.5" />
+                {rec.candlePattern.replace(/_/g, ' ')}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Trading Thesis */}
       <TradingThesis rec={rec} price={price} t={t} />
@@ -560,6 +633,47 @@ export default function Trading() {
     return { hashRate, nvt }
   }, [onchainRaw])
 
+  // v2: Derivatives data (funding rate, open interest)
+  const { data: derivativesRaw } = useSupabaseQuery<OnchainMetric[]>(
+    () =>
+      supabase
+        .from('onchain_metrics')
+        .select('*')
+        .in('metric', ['FUNDING_RATE', 'OPEN_INTEREST'])
+        .order('date', { ascending: false })
+        .limit(4),
+    [],
+    'derivatives-trading-signals',
+  )
+
+  const fundingRate = useMemo(() => derivativesRaw?.find(m => m.metric === 'FUNDING_RATE') ?? null, [derivativesRaw])
+  const openInterest = useMemo(() => derivativesRaw?.find(m => m.metric === 'OPEN_INTEREST') ?? null, [derivativesRaw])
+
+  // v2: Fibonacci levels and confluence zones
+  const { data: fibLevels } = useFibonacciLevels()
+  const { data: confluences } = useConfluenceZones()
+
+  // v2: Latest signal history (for candle patterns, setup type)
+  const { data: signalHistoryRaw } = useSignalHistory(10)
+  const latestV2Signals = useMemo(() => {
+    if (!signalHistoryRaw) return null
+    const byTf = new Map<string, typeof signalHistoryRaw[0]>()
+    for (const s of signalHistoryRaw) {
+      if (!byTf.has(s.timeframe)) byTf.set(s.timeframe, s)
+    }
+    return Array.from(byTf.values())
+  }, [signalHistoryRaw])
+
+  // v2: Compose v2 data object
+  const v2Data: V2TradingData = useMemo(() => ({
+    fundingRate,
+    openInterest,
+    priceLevels: priceLevels ?? null,
+    fibLevels: fibLevels ?? null,
+    confluences: confluences ?? null,
+    latestV2Signals,
+  }), [fundingRate, openInterest, priceLevels, fibLevels, confluences, latestV2Signals])
+
   const bbIndicators = useMemo(() => {
     if (!allIndicators) return null
     return allIndicators.filter((i) => i.indicator.startsWith('BB_'))
@@ -570,7 +684,7 @@ export default function Trading() {
     return prices[0].close
   }, [prices])
 
-  const recommendations = useTradingRecommendations(signals, bbIndicators, sentiment, onchainMetrics, cycleScore, currentPrice, allIndicators)
+  const recommendations = useTradingRecommendations(signals, bbIndicators, sentiment, onchainMetrics, cycleScore, currentPrice, allIndicators, v2Data)
 
   if (priceLoading) {
     return (
@@ -624,7 +738,10 @@ export default function Trading() {
               <span>{rec.direction}</span>
             </div>
             <div className="text-center">
-              <span className={cn('text-lg font-mono font-bold', directionColor(rec.direction))}>{rec.confidence}%</span>
+              <span className={cn('text-lg font-mono font-bold', directionColor(rec.direction))}>{rec.extendedScore}%</span>
+              <div className={cn('text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded border inline-block', classificationBg(rec.classification))}>
+                {rec.classification}
+              </div>
             </div>
             {rec.levels && (
               <div className="mt-3 pt-3 border-t border-border/50 space-y-1 text-xs font-mono">

@@ -495,6 +495,27 @@ const S: Record<Lang, Record<string, string>> = {
     'trading.winRateLabel': 'Win Rate',
     'trading.total': 'Total',
 
+    // v2 Extended scoring
+    'trading.extendedScore': 'Score Extendido',
+    'trading.baseScore': 'Base',
+    'trading.bonusLevels': 'Niveles',
+    'trading.bonusCandles': 'Velas',
+    'trading.bonusOnchain': 'On-Chain',
+    'trading.penaltiesLabel': 'Penalizaciones',
+    'trading.classificationLabel': 'Clasificacion',
+    'trading.setupType': 'Setup',
+    'trading.candlePatternLabel': 'Patron',
+
+    // Signal explanations for new indicators
+    'sig.fr.extremeBullish': 'funding extremo negativo — fuerte señal contrarian alcista',
+    'sig.fr.bullish': 'funding negativo — contrarian alcista',
+    'sig.fr.bearish': 'funding positivo — exceso de longs apalancados',
+    'sig.fr.extremeBearish': 'funding extremo positivo — contrarian bajista',
+    'sig.fr.neutral': 'funding neutral, sin presion de apalancamiento',
+    'sig.oi.bullish': 'OI bajo — mercado organico, menor riesgo de liquidaciones',
+    'sig.oi.bearish': 'OI alto — alto apalancamiento, riesgo de liquidaciones',
+    'sig.oi.neutral': 'OI en niveles normales',
+
     // Portfolio
     'portfolio.title': 'Portfolio',
     'portfolio.subtitle': 'Gestiona tus posiciones',
@@ -1004,6 +1025,27 @@ const S: Record<Lang, Record<string, string>> = {
     'trading.timeframe': 'Timeframe',
     'trading.winRateLabel': 'Win Rate',
     'trading.total': 'Total',
+
+    // v2 Extended scoring
+    'trading.extendedScore': 'Extended Score',
+    'trading.baseScore': 'Base',
+    'trading.bonusLevels': 'Levels',
+    'trading.bonusCandles': 'Candles',
+    'trading.bonusOnchain': 'On-Chain',
+    'trading.penaltiesLabel': 'Penalties',
+    'trading.classificationLabel': 'Classification',
+    'trading.setupType': 'Setup',
+    'trading.candlePatternLabel': 'Pattern',
+
+    // Signal explanations for new indicators
+    'sig.fr.extremeBullish': 'extreme negative funding — strong contrarian bullish',
+    'sig.fr.bullish': 'negative funding — contrarian bullish signal',
+    'sig.fr.bearish': 'positive funding — overcrowded longs',
+    'sig.fr.extremeBearish': 'extreme positive funding — contrarian bearish',
+    'sig.fr.neutral': 'neutral funding, no leverage pressure',
+    'sig.oi.bullish': 'low OI — organic market, less liquidation risk',
+    'sig.oi.bearish': 'high OI — heavy leverage, liquidation risk',
+    'sig.oi.neutral': 'normal OI levels',
 
     // Portfolio
     'portfolio.title': 'Portfolio',

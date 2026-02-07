@@ -1,5 +1,5 @@
 import { supabase, useSupabaseQuery } from './useSupabase'
-import type { PriceLevel, ConfluenceZone } from '../lib/types'
+import type { PriceLevel, FibonacciLevel, ConfluenceZone } from '../lib/types'
 
 export function usePriceLevels(minStrength = 0) {
   return useSupabaseQuery<PriceLevel[]>(
@@ -13,6 +13,20 @@ export function usePriceLevels(minStrength = 0) {
         .limit(50),
     [minStrength],
     `price-levels-${minStrength}`,
+  )
+}
+
+export function useFibonacciLevels() {
+  return useSupabaseQuery<FibonacciLevel[]>(
+    () =>
+      supabase
+        .from('fibonacci_levels')
+        .select('*')
+        .eq('status', 'active')
+        .order('timeframe', { ascending: true })
+        .limit(30),
+    [],
+    'fibonacci-levels',
   )
 }
 
