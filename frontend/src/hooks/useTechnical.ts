@@ -304,15 +304,17 @@ function classifyScore(score: number): string {
   if (score >= 70) return 'STRONG'
   if (score >= 55) return 'VALID'
   if (score >= 40) return 'WEAK'
-  return 'REJECTED'
+  return 'NO ENTRAR'
 }
 
 // ── v2: Enhanced TP/SL with structural levels ───────────────────────────────
 
-const ATR_BUFFER: Record<string, number> = { '1H': 1.0, '4H': 1.5, '1D': 2.0, '1W': 2.5 }
+const ATR_BUFFER: Record<string, number> = { '1H': 0.5, '4H': 0.8, '1D': 1.0, '1W': 1.5 }
 const MAX_SL_PCT: Record<string, number> = { '1H': 2.0, '4H': 4.0, '1D': 7.0, '1W': 12.0 }
-const MIN_RR1: Record<string, number> = { '1H': 1.2, '4H': 1.5, '1D': 1.5, '1W': 2.0 }
-const MIN_RR2: Record<string, number> = { '1H': 2.0, '4H': 2.5, '1D': 3.0, '1W': 4.0 }
+const MIN_RR1: Record<string, number> = { '1H': 1.0, '4H': 1.2, '1D': 1.2, '1W': 1.5 }
+const MIN_RR2: Record<string, number> = { '1H': 1.5, '4H': 2.0, '1D': 2.0, '1W': 2.5 }
+const MAX_TP1_PCT: Record<string, number> = { '1H': 2.0, '4H': 4.0, '1D': 6.0, '1W': 10.0 }
+const MAX_TP2_PCT: Record<string, number> = { '1H': 4.0, '4H': 7.0, '1D': 10.0, '1W': 18.0 }
 
 function findFibPrice(fibs: FibonacciLevel[], targetRatio: number, price: number, side: 'above' | 'below'): number | null {
   for (const fib of fibs) {
@@ -347,7 +349,23 @@ function findFibExtension(fibs: FibonacciLevel[], targetRatio: number, beyondPri
 function buildLevelsResult(
   entry: number, sl: number, tp1: number, tp2: number,
   slMethod: string, tp1Method: string, tp2Method: string,
+  timeframe = '4H',
 ): TradingLevels {
+  // Cap TP values to max % per timeframe
+  const maxTp1Pct = MAX_TP1_PCT[timeframe] ?? 4.0
+  const maxTp2Pct = MAX_TP2_PCT[timeframe] ?? 7.0
+  const tp1Pct = Math.abs(tp1 - entry) / entry * 100
+  const tp2Pct = Math.abs(tp2 - entry) / entry * 100
+
+  if (tp1Pct > maxTp1Pct) {
+    tp1 = tp1 > entry ? entry * (1 + maxTp1Pct / 100) : entry * (1 - maxTp1Pct / 100)
+    tp1Method = tp1Method + '_capped'
+  }
+  if (tp2Pct > maxTp2Pct) {
+    tp2 = tp2 > entry ? entry * (1 + maxTp2Pct / 100) : entry * (1 - maxTp2Pct / 100)
+    tp2Method = tp2Method + '_capped'
+  }
+
   const risk = Math.abs(entry - sl)
   const reward1 = Math.abs(tp1 - entry)
   const reward2 = Math.abs(tp2 - entry)
@@ -560,7 +578,7 @@ function computeEnhancedLevels(
     }
   }
 
-  return buildLevelsResult(price, sl, tp1, tp2, slMethod, tp1Method, tp2Method)
+  return buildLevelsResult(price, sl, tp1, tp2, slMethod, tp1Method, tp2Method, timeframe)
 }
 
 // Fallback: original ATR + Bollinger computation
@@ -579,10 +597,10 @@ function computeLevelsFallback(
   if (!atr || atr <= 0) return null
 
   const mult: Record<string, { sl: number; tp1: number; tp2: number }> = {
-    '1H': { sl: 0.5, tp1: 0.75, tp2: 1.5 },
-    '4H': { sl: 1.0, tp1: 1.5, tp2: 3.0 },
-    '1D': { sl: 1.5, tp1: 2.0, tp2: 4.0 },
-    '1W': { sl: 2.5, tp1: 3.5, tp2: 7.0 },
+    '1H': { sl: 0.3, tp1: 0.5, tp2: 0.9 },
+    '4H': { sl: 0.5, tp1: 0.8, tp2: 1.5 },
+    '1D': { sl: 0.8, tp1: 1.2, tp2: 2.0 },
+    '1W': { sl: 1.2, tp1: 2.0, tp2: 3.5 },
   }
 
   const m = mult[timeframe] ?? mult['4H']
@@ -624,7 +642,7 @@ function computeLevelsFallback(
     else { tp2 = atrTP2 }
   }
 
-  return buildLevelsResult(price, sl, tp1, tp2, slMethod, tp1Method, tp2Method)
+  return buildLevelsResult(price, sl, tp1, tp2, slMethod, tp1Method, tp2Method, timeframe)
 }
 
 // ── V2 Data Interface ───────────────────────────────────────────────────────
