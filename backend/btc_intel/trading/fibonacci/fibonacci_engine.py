@@ -219,67 +219,48 @@ class FibonacciEngine:
     # ------------------------------------------------------------------
 
     def _persist(self, result: dict) -> None:
-        """Upsert Fibonacci levels into the ``fibonacci_levels`` table.
+        """Persist Fibonacci levels into the ``fibonacci_levels`` table.
 
-        Rows are uniquely identified by (timeframe, type, direction).
+        Creates 2 rows per timeframe (1 retracement + 1 extension), storing
+        all individual ratios/prices inside the ``levels`` JSONB column.
         """
         sb = get_supabase()
         now = datetime.now(timezone.utc).isoformat()
-        timeframe = result["timeframe"]
+        tf = result["timeframe"]
         direction = result["direction"]
 
-        rows: list[dict] = []
+        base = {
+            "timeframe": tf,
+            "direction": direction,
+            "swing_low": result["swing_low"],
+            "swing_high": result["swing_high"],
+            "swing_low_date": str(result["swing_low_date"]) if result.get("swing_low_date") else None,
+            "swing_high_date": str(result["swing_high_date"]) if result.get("swing_high_date") else None,
+            "pullback_end": None,
+            "status": "active",
+            "updated_at": now,
+        }
 
-        for r in result["retracements"]:
-            rows.append(
-                {
-                    "timeframe": timeframe,
-                    "type": "retracement",
-                    "direction": direction,
-                    "ratio": r["ratio"],
-                    "label": r["label"],
-                    "price": r["price"],
-                    "zone_low": r["zone_low"],
-                    "zone_high": r["zone_high"],
-                    "entry_quality": r["entry_quality"],
-                    "swing_high": result["swing_high"],
-                    "swing_low": result["swing_low"],
-                    "updated_at": now,
-                }
+        ret_levels = {str(r["ratio"]): r["price"] for r in result["retracements"]}
+        ext_levels = {str(e["ratio"]): e["price"] for e in result["extensions"]}
+
+        rows = [
+            {**base, "type": "retracement", "levels": ret_levels},
+            {**base, "type": "extension", "levels": ext_levels},
+        ]
+
+        try:
+            sb.table("fibonacci_levels").delete().eq(
+                "timeframe", tf
+            ).eq("direction", direction).execute()
+            sb.table("fibonacci_levels").insert(rows).execute()
+            logger.info(
+                "Persisted 2 Fibonacci rows (ret+ext) for %s %s",
+                tf,
+                direction,
             )
-
-        for e in result["extensions"]:
-            rows.append(
-                {
-                    "timeframe": timeframe,
-                    "type": "extension",
-                    "direction": direction,
-                    "ratio": e["ratio"],
-                    "label": e["label"],
-                    "price": e["price"],
-                    "zone_low": None,
-                    "zone_high": None,
-                    "entry_quality": None,
-                    "swing_high": result["swing_high"],
-                    "swing_low": result["swing_low"],
-                    "updated_at": now,
-                }
-            )
-
-        if rows:
-            try:
-                sb.table("fibonacci_levels").upsert(
-                    rows,
-                    on_conflict="timeframe,type,direction,ratio",
-                ).execute()
-                logger.info(
-                    "Persisted %d Fibonacci levels for %s %s",
-                    len(rows),
-                    timeframe,
-                    direction,
-                )
-            except Exception:
-                logger.exception("Failed to persist Fibonacci levels for %s", timeframe)
+        except Exception:
+            logger.exception("Failed to persist Fibonacci levels for %s", tf)
 
     # ------------------------------------------------------------------
     # Helpers

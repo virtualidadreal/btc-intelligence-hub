@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { ArrowUp, ArrowDown, Minus, Info, Target, ShieldAlert, Bitcoin, BarChart3, Layers, TrendingUp, Zap, Activity } from 'lucide-react'
 import { SignalBadge } from '../components/common/MetricCard'
+import SignalTimeline from '../components/trading/SignalTimeline'
 import { CardSkeleton } from '../components/common/LoadingSkeleton'
 import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
@@ -979,6 +980,9 @@ export default function Trading() {
           </div>
         </div>
       )}
+
+      {/* Signal History Timeline */}
+      <SignalTimeline />
 
       {/* Disclaimer */}
       <p className="text-[10px] text-text-muted italic text-center">

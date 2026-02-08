@@ -334,17 +334,17 @@ def _load_v2_data(db, current_price: float) -> dict | None:
             for r in (levels_res.data or [])
         ]
 
-        # Load fib data per timeframe
-        fib_res = db.table("fibonacci_levels").select("timeframe,type,ratio,price,label").execute()
+        # Load fib data per timeframe (levels stored as JSONB)
+        fib_res = db.table("fibonacci_levels").select("timeframe,type,direction,levels").execute()
         fib_context = {}
         for row in (fib_res.data or []):
             tf = row["timeframe"]
             if tf not in fib_context:
-                fib_context[tf] = {"retracements": [], "extensions": []}
+                fib_context[tf] = {"retracements": {}, "extensions": {}, "direction": row.get("direction")}
             if row["type"] == "retracement":
-                fib_context[tf]["retracements"].append(row)
+                fib_context[tf]["retracements"] = row.get("levels", {})
             else:
-                fib_context[tf]["extensions"].append(row)
+                fib_context[tf]["extensions"] = row.get("levels", {})
 
         return {
             "nearby_levels": nearby_levels,

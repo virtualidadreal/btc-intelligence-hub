@@ -65,7 +65,11 @@ class FibConfluenceDetector:
         confluences: list[dict],
         current_price: float,
     ) -> None:
-        """Save confluence zones to the ``confluence_zones`` Supabase table."""
+        """Save confluence zones to the ``confluence_zones`` Supabase table.
+
+        Maps to schema columns: price_low, price_high, price_mid, type,
+        timeframes, fib_ratios, num_timeframes, strength, has_gran_nivel.
+        """
         if not confluences:
             return
 
@@ -74,20 +78,29 @@ class FibConfluenceDetector:
 
         rows: list[dict] = []
         for conf in confluences:
-            distance_pct = round(
-                abs(conf["price"] - current_price) / current_price * 100, 2
-            )
+            avg_price = conf["price"]
+            # Zone: ±0.5% around the average price
+            price_low = round(avg_price * 0.995, 2)
+            price_high = round(avg_price * 1.005, 2)
+
+            # Determine type based on current price
+            zone_type = "support" if avg_price < current_price else "resistance"
+
+            # Strength: num_timeframes * 3 + max_quality, capped at 20
+            strength = min(conf["num_timeframes"] * 3 + conf.get("max_quality", 0), 20)
+
             rows.append(
                 {
-                    "price": conf["price"],
+                    "price_low": price_low,
+                    "price_high": price_high,
+                    "price_mid": round(avg_price, 2),
+                    "type": zone_type,
                     "timeframes": conf["timeframes"],
                     "fib_ratios": conf["fib_ratios"],
-                    "fib_labels": conf["fib_labels"],
-                    "directions": conf["directions"],
                     "num_timeframes": conf["num_timeframes"],
-                    "max_quality": conf["max_quality"],
-                    "distance_pct": distance_pct,
-                    "current_price": current_price,
+                    "strength": strength,
+                    "has_gran_nivel": conf["num_timeframes"] >= 3,
+                    "status": "active",
                     "updated_at": now,
                 }
             )
@@ -95,7 +108,7 @@ class FibConfluenceDetector:
         try:
             # Replace all confluence zones on each run.
             sb.table("confluence_zones").delete().neq(
-                "price", -1
+                "id", -1
             ).execute()  # clear table
             sb.table("confluence_zones").insert(rows).execute()
             logger.info("Persisted %d confluence zones", len(rows))

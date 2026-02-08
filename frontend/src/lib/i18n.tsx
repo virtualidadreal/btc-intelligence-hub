@@ -222,11 +222,11 @@ const S: Record<Lang, Record<string, string>> = {
     'technical.overlay.bb': 'Bollinger',
     'technical.overlay.sr': 'S/R',
     'technical.overlay.fib': 'Fibonacci',
-    'technical.overlay.patterns': 'Patrones',
     'technical.overlay.volume': 'Volumen',
     'technical.timeframe': 'Timeframe',
     'technical.range': 'Rango',
     'technical.candlestick': 'Grafico de Velas + Overlays',
+    'technical.candles': 'Velas',
     'technical.levelMap': 'Mapa de Niveles',
     'technical.resistances': 'RESISTENCIAS',
     'technical.supports': 'SOPORTES',
@@ -570,6 +570,14 @@ const S: Record<Lang, Record<string, string>> = {
     'trading.penEuphoria': 'euforia extrema',
     'trading.penExtremeFear': 'miedo extremo',
 
+    // Signal Timeline
+    'trading.signalTimeline': 'Historial de Señales',
+    'trading.allTimeframes': 'Todos',
+    'trading.filter_all': 'Todos',
+    'trading.filter_won': 'Ganadas',
+    'trading.filter_lost': 'Perdidas',
+    'trading.filter_pending': 'Pendientes',
+
     // Signal explanations for new indicators
     'sig.fr.extremeBullish': 'funding extremo negativo — fuerte señal contrarian alcista',
     'sig.fr.bullish': 'funding negativo — contrarian alcista',
@@ -817,11 +825,11 @@ const S: Record<Lang, Record<string, string>> = {
     'technical.overlay.bb': 'Bollinger',
     'technical.overlay.sr': 'S/R',
     'technical.overlay.fib': 'Fibonacci',
-    'technical.overlay.patterns': 'Patterns',
     'technical.overlay.volume': 'Volume',
     'technical.timeframe': 'Timeframe',
     'technical.range': 'Range',
     'technical.candlestick': 'Candlestick Chart + Overlays',
+    'technical.candles': 'Candles',
     'technical.levelMap': 'Level Map',
     'technical.resistances': 'RESISTANCES',
     'technical.supports': 'SUPPORTS',
@@ -1164,6 +1172,14 @@ const S: Record<Lang, Record<string, string>> = {
     'trading.penOverextended': 'Overextended from EMA 21',
     'trading.penEuphoria': 'extreme euphoria',
     'trading.penExtremeFear': 'extreme fear',
+
+    // Signal Timeline
+    'trading.signalTimeline': 'Signal History',
+    'trading.allTimeframes': 'All',
+    'trading.filter_all': 'All',
+    'trading.filter_won': 'Won',
+    'trading.filter_lost': 'Lost',
+    'trading.filter_pending': 'Pending',
 
     // Signal explanations for new indicators
     'sig.fr.extremeBullish': 'extreme negative funding — strong contrarian bullish',
