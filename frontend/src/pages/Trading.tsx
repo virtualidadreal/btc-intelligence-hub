@@ -467,18 +467,24 @@ function TimeframeDetail({ rec, price, t, v2Data, htfDirection }: { rec: Trading
   const entries = Object.entries(rec.signals).sort((a, b) => Math.abs(b[1].contribution) - Math.abs(a[1].contribution))
   const maxAbs = entries.reduce((max, [, d]) => Math.max(max, Math.abs(d.contribution)), 0)
   const totalSignals = rec.bullishCount + rec.bearishCount + rec.neutralCount
+  const v2Signal = v2Data?.latestV2Signals?.find(s => s.timeframe === rec.timeframe)
 
   return (
     <div className="rounded-xl bg-bg-secondary/60 border border-border backdrop-blur-sm overflow-hidden">
       {/* Header */}
       <div className={cn('flex items-center justify-between p-4 border-b border-border', directionBg(rec.direction))}>
-        <div className="flex items-center gap-3">
-          <div className={cn('flex items-center gap-1.5 font-bold text-xl', directionColor(rec.direction))}>
-            <DirectionIcon direction={rec.direction} className="w-6 h-6" />
-            <span>{rec.direction}</span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            <div className={cn('flex items-center gap-1.5 font-bold text-xl', directionColor(rec.direction))}>
+              <DirectionIcon direction={rec.direction} className="w-6 h-6" />
+              <span>{rec.direction}</span>
+            </div>
+            <span className="text-xs font-mono text-text-muted bg-bg-tertiary/60 px-2 py-0.5 rounded">{rec.timeframe}</span>
+            <span className="text-xs text-text-secondary hidden sm:block">{t(`trading.${rec.timeframe}`)}</span>
           </div>
-          <span className="text-xs font-mono text-text-muted bg-bg-tertiary/60 px-2 py-0.5 rounded">{rec.timeframe}</span>
-          <span className="text-xs text-text-secondary hidden sm:block">{t(`trading.${rec.timeframe}`)}</span>
+          {v2Signal?.date && (
+            <span className="text-[10px] font-mono text-text-muted">{formatTimestamp(v2Signal.date)}</span>
+          )}
         </div>
         <div className="text-right">
           <span className={cn('font-mono text-lg font-bold', directionColor(rec.direction))}>{rec.extendedScore}%</span>
