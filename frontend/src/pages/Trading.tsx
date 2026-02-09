@@ -104,6 +104,14 @@ function classificationColor(cls: string) {
   }
 }
 
+function classifyScore(score: number): string {
+  if (score >= 85) return 'PREMIUM'
+  if (score >= 70) return 'STRONG'
+  if (score >= 55) return 'VALID'
+  if (score >= 40) return 'WEAK'
+  return 'NO ENTRY'
+}
+
 function classificationBg(cls: string) {
   switch (cls) {
     case 'PREMIUM': return 'bg-yellow-400/15 border-yellow-400/30 text-yellow-400'
@@ -729,54 +737,81 @@ export default function Trading() {
         </div>
       </div>
 
-      {/* Summary cards */}
+      {/* Summary cards — driven by signal_history (single source of truth) */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {recommendations.map((rec) => {
-          const signalDate = latestV2Signals?.find(s => s.timeframe === rec.timeframe)?.date
+        {(['1H', '4H', '1D', '1W'] as const).map((tf) => {
+          const sig = latestV2Signals?.find(s => s.timeframe === tf)
+          const tfLabels: Record<string, string> = { '1H': t('trading.1H'), '4H': t('trading.4H'), '1D': t('trading.1D'), '1W': t('trading.1W') }
+
+          if (!sig) {
+            return (
+              <div key={tf} className="rounded-xl border border-border/50 p-4 backdrop-blur-sm bg-bg-secondary/30">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-sm font-mono text-text-muted">{tf}</span>
+                  <span className="text-[10px] text-text-muted">{tfLabels[tf]}</span>
+                </div>
+                <div className="flex items-center justify-center gap-1.5 text-text-muted text-lg font-bold py-3">
+                  <Minus className="w-5 h-5" />
+                  <span>{t('trading.noSignal') || 'NO SIGNAL'}</span>
+                </div>
+                <div className="text-center text-[10px] text-text-muted">{t('trading.waitingSignal') || 'Waiting for valid signal'}</div>
+              </div>
+            )
+          }
+
+          const direction = sig.direction
+          const extScore = sig.extended_score ?? sig.confidence
+          const cls = sig.classification || classifyScore(extScore)
+          const priceAt = sig.price_at_signal
+
           return (
-          <div key={rec.timeframe} className={cn('rounded-xl border p-4 backdrop-blur-sm', directionBg(rec.direction))}>
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-sm font-mono text-text-muted">{rec.timeframe}</span>
-              <span className="text-[10px] text-text-muted">{t(`trading.${rec.timeframe}`)}</span>
-            </div>
-            {signalDate && (
-              <div className="text-[10px] text-text-muted font-mono text-center mb-1">{formatTimestamp(signalDate)}</div>
-            )}
-            <div className={cn('flex items-center justify-center gap-1.5 font-bold text-2xl mb-1', directionColor(rec.direction))}>
-              <DirectionIcon direction={rec.direction} className="w-7 h-7" />
-              <span>{rec.direction}</span>
-            </div>
-            <div className="text-center">
-              <span className={cn('text-lg font-mono font-bold', directionColor(rec.direction))}>{rec.extendedScore}%</span>
-              <div className={cn('text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded border inline-block', classificationBg(rec.classification))}>
-                {rec.classification}
+            <div key={tf} className={cn('rounded-xl border p-4 backdrop-blur-sm', directionBg(direction))}>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-mono text-text-muted">{tf}</span>
+                <span className="text-[10px] text-text-muted">{tfLabels[tf]}</span>
               </div>
-            </div>
-            {rec.levels && (
-              <div className="mt-3 pt-3 border-t border-border/50 space-y-1 text-xs font-mono">
-                <div className="flex justify-between">
-                  <span className="text-bullish">TP2</span>
-                  <span>{formatPrice(rec.levels.tp2)}</span>
-                  <span className="text-bullish">+{rec.levels.tp2Percent}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-bullish">TP1</span>
-                  <span>{formatPrice(rec.levels.tp1)}</span>
-                  <span className="text-bullish">+{rec.levels.tp1Percent}%</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-bearish">SL</span>
-                  <span>{formatPrice(rec.levels.sl)}</span>
-                  <span className="text-bearish">{rec.levels.slPercent}%</span>
+              {sig.date && (
+                <div className="text-[10px] text-text-muted font-mono text-center mb-1">{formatTimestamp(sig.date)}</div>
+              )}
+              <div className={cn('flex items-center justify-center gap-1.5 font-bold text-2xl mb-1', directionColor(direction))}>
+                <DirectionIcon direction={direction} className="w-7 h-7" />
+                <span>{direction}</span>
+              </div>
+              <div className="text-center">
+                <span className={cn('text-lg font-mono font-bold', directionColor(direction))}>{extScore}%</span>
+                <div className={cn('text-[9px] font-bold mt-1 px-1.5 py-0.5 rounded border inline-block', classificationBg(cls))}>
+                  {cls}
                 </div>
               </div>
-            )}
-            <div className="flex justify-center gap-2 mt-2 text-[10px] font-mono">
-              {rec.bullishCount > 0 && <span className="text-bullish">{rec.bullishCount} {t('trading.bull')}</span>}
-              {rec.bearishCount > 0 && <span className="text-bearish">{rec.bearishCount} {t('trading.bear')}</span>}
-              {rec.neutralCount > 0 && <span className="text-neutral-signal">{rec.neutralCount} {t('trading.flat')}</span>}
+              {sig.tp1 && sig.tp2 && sig.sl && (
+                <div className="mt-3 pt-3 border-t border-border/50 space-y-1 text-xs font-mono">
+                  <div className="flex justify-between">
+                    <span className="text-bullish">TP2</span>
+                    <span>{formatPrice(sig.tp2)}</span>
+                    <span className="text-bullish">+{(Math.abs(sig.tp2 - priceAt) / priceAt * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-bullish">TP1</span>
+                    <span>{formatPrice(sig.tp1)}</span>
+                    <span className="text-bullish">+{(Math.abs(sig.tp1 - priceAt) / priceAt * 100).toFixed(0)}%</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-bearish">SL</span>
+                    <span>{formatPrice(sig.sl)}</span>
+                    <span className="text-bearish">-{(Math.abs(sig.sl - priceAt) / priceAt * 100).toFixed(0)}%</span>
+                  </div>
+                </div>
+              )}
+              {priceAt && currentPrice && (
+                <div className="text-center mt-2 text-[10px] font-mono text-text-muted">
+                  Entry: {formatPrice(priceAt)}
+                  {' '}
+                  <span className={cn(currentPrice >= priceAt ? 'text-bullish' : 'text-bearish')}>
+                    ({((currentPrice - priceAt) / priceAt * 100) >= 0 ? '+' : ''}{((currentPrice - priceAt) / priceAt * 100).toFixed(1)}%)
+                  </span>
+                </div>
+              )}
             </div>
-          </div>
           )
         })}
       </div>
