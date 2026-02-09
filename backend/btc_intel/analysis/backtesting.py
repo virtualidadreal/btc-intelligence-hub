@@ -1,6 +1,6 @@
 """Backtesting — Store signal snapshots and evaluate past signals."""
 
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from rich.console import Console
 
@@ -107,7 +107,7 @@ def store_signal_snapshot():
     v2_data = _load_v2_data(db, current_price)
 
     # Compute score for each timeframe
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     snapshots = 0
 
     for tf, weights in WEIGHTS.items():
@@ -212,14 +212,14 @@ def evaluate_past_signals():
             signal_dt = datetime.fromisoformat(signal_date.replace("Z", "+00:00"))
         except (ValueError, AttributeError):
             try:
-                signal_dt = datetime.strptime(signal_date[:10], "%Y-%m-%d")
+                signal_dt = datetime.strptime(signal_date[:10], "%Y-%m-%d").replace(tzinfo=timezone.utc)
             except (ValueError, AttributeError):
                 continue
 
         eval_after = signal_dt + timedelta(hours=eval_hours)
 
         # Check if enough time has passed
-        if datetime.utcnow() < eval_after:
+        if datetime.now(timezone.utc) < eval_after:
             continue
 
         # Get prices between signal and evaluation window
