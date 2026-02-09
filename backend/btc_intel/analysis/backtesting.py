@@ -162,6 +162,11 @@ def store_signal_snapshot():
                 record["tp1_method"] = tpsl.get("tp1_method", "")
                 record["tp2_method"] = tpsl.get("tp2_method", "")
 
+        # Skip NO ENTRY signals (NEUTRAL direction or score < 40)
+        final_score = record.get("extended_score") or confidence
+        if direction == "NEUTRAL" or final_score < 40:
+            continue
+
         try:
             db.table("signal_history").upsert(
                 record, on_conflict="date,timeframe"
