@@ -14,8 +14,8 @@ import { useLatestSentiment } from '../hooks/useSentiment'
 import { useSignalAccuracy, useSignalHistory } from '../hooks/useSignalHistory'
 import { usePriceLevels, useFibonacciLevels, useConfluenceZones } from '../hooks/useLevels'
 import { useSupabaseQuery, supabase } from '../hooks/useSupabase'
-import type { OnchainMetric, PriceLevel as PriceLevelType } from '../lib/types'
-import { formatPrice, formatPercent, cn } from '../lib/utils'
+import type { OnchainMetric } from '../lib/types'
+import { formatPrice, formatPercent, formatTimestamp, cn } from '../lib/utils'
 import { useI18n } from '../lib/i18n'
 
 function signalExplanation(key: string, detail: SignalDetail, t: (k: string) => string): string {
@@ -99,7 +99,7 @@ function classificationColor(cls: string) {
     case 'STRONG': return 'text-green-400'
     case 'VALID': return 'text-blue-400'
     case 'WEAK': return 'text-orange-400'
-    case 'REJECTED': return 'text-red-400'
+    case 'NO ENTRY': return 'text-red-400'
     default: return 'text-text-muted'
   }
 }
@@ -110,7 +110,7 @@ function classificationBg(cls: string) {
     case 'STRONG': return 'bg-green-400/15 border-green-400/30 text-green-400'
     case 'VALID': return 'bg-blue-400/15 border-blue-400/30 text-blue-400'
     case 'WEAK': return 'bg-orange-400/15 border-orange-400/30 text-orange-400'
-    case 'REJECTED': return 'bg-red-400/15 border-red-400/30 text-red-400'
+    case 'NO ENTRY': return 'bg-red-400/15 border-red-400/30 text-red-400'
     default: return 'bg-bg-tertiary border-border text-text-muted'
   }
 }
@@ -119,14 +119,12 @@ function StructuralAnalysis({ price, direction, rec, v2Data, htfDirection, t }: 
   price: number; direction: string; rec: TradingRecommendation; v2Data: V2TradingData; htfDirection: string | null; t: (k: string) => string
 }) {
   const levels = v2Data.priceLevels ?? []
-  const fibs = v2Data.fibLevels ?? []
   const confluences = v2Data.confluences ?? []
   const ema21 = rec.signals['EMA_21']?.rawValue ?? null
   const fearGreed = rec.signals['FEAR_GREED']?.rawValue ?? null
 
   type Item = { icon: string; text: string; color: string }
   const levelItems: Item[] = []
-  const fibItems: Item[] = []
   const penaltyItems: Item[] = []
 
   // --- Level analysis ---
@@ -149,43 +147,13 @@ function StructuralAnalysis({ price, direction, rec, v2Data, htfDirection, t }: 
   if (near1pct.some(lv => lv.is_role_flip)) levelItems.push({ icon: '✓', text: `Role flip → +4`, color: 'text-green-400' })
   if (near1pct.some(lv => lv.is_psychological)) levelItems.push({ icon: '✓', text: `${t('trading.psychLevel')} → +1`, color: 'text-green-400' })
 
-  // --- Fibonacci analysis ---
-  if (fibs.length === 0) {
-    fibItems.push({ icon: '—', text: t('trading.noFibData'), color: 'text-text-muted' })
-  } else {
-    let foundGP = false
-    let nearestFib: { r: number; p: number; d: number } | null = null
-
-    for (const fib of fibs) {
-      if (fib.type === 'extension') continue
-      const lvls = fib.levels as Record<string, number>
-      for (const [rs, fp] of Object.entries(lvls)) {
-        if (typeof fp !== 'number') continue
-        const r = parseFloat(rs), d = Math.abs(price - fp) / (fp || 1) * 100
-        if (d <= 1.0 && (Math.abs(r - 0.618) < 0.01 || Math.abs(r - 0.65) < 0.01)) {
-          foundGP = true
-          fibItems.push({ icon: '✓', text: `Golden Pocket (${r}) @ ${formatPrice(fp)} → +7`, color: 'text-green-400' })
-        }
-        if (!nearestFib || d < nearestFib.d) nearestFib = { r, p: fp, d }
-      }
-    }
-
-    if (!foundGP && nearestFib) {
-      fibItems.push({
-        icon: nearestFib.d <= 1.0 ? '~' : '✗',
-        text: `${t('trading.nearestFib')}: ${nearestFib.r.toFixed(3)} @ ${formatPrice(nearestFib.p)} (${nearestFib.d.toFixed(1)}%)`,
-        color: nearestFib.d <= 1.0 ? 'text-blue-400' : 'text-red-400/70',
-      })
-    }
-
-    // Confluence
-    const nearConf = confluences.filter(c => Math.abs(price - c.price_mid) / (c.price_mid || 1) * 100 <= 1.0 && c.num_timeframes >= 2)
-    if (nearConf.length > 0) {
-      fibItems.push({ icon: '✓', text: `${t('trading.confluenceZone')} ${formatPrice(nearConf[0].price_mid)} (${nearConf[0].num_timeframes} TF) → +6`, color: 'text-green-400' })
-    } else if (confluences.length > 0) {
-      const nc = [...confluences].sort((a, b) => Math.abs(price - a.price_mid) - Math.abs(price - b.price_mid))[0]
-      fibItems.push({ icon: '✗', text: `${t('trading.nearestConfluence')}: ${formatPrice(nc.price_mid)} (${nc.num_timeframes} TF) a ${(Math.abs(price - nc.price_mid) / (nc.price_mid || 1) * 100).toFixed(1)}%`, color: 'text-red-400/70' })
-    }
+  // --- Confluence (kept without Fibonacci) ---
+  const nearConf = confluences.filter(c => Math.abs(price - c.price_mid) / (c.price_mid || 1) * 100 <= 1.0 && c.num_timeframes >= 2)
+  if (nearConf.length > 0) {
+    levelItems.push({ icon: '✓', text: `${t('trading.confluenceZone')} ${formatPrice(nearConf[0].price_mid)} (${nearConf[0].num_timeframes} TF) → +6`, color: 'text-green-400' })
+  } else if (confluences.length > 0) {
+    const nc = [...confluences].sort((a, b) => Math.abs(price - a.price_mid) - Math.abs(price - b.price_mid))[0]
+    levelItems.push({ icon: '✗', text: `${t('trading.nearestConfluence')}: ${formatPrice(nc.price_mid)} (${nc.num_timeframes} TF) a ${(Math.abs(price - nc.price_mid) / (nc.price_mid || 1) * 100).toFixed(1)}%`, color: 'text-red-400/70' })
   }
 
   // --- Penalty reasons ---
@@ -208,16 +176,6 @@ function StructuralAnalysis({ price, direction, rec, v2Data, htfDirection, t }: 
           <Layers className="w-3 h-3" /> {t('trading.srLevels')}
         </span>
         {levelItems.map((it, i) => (
-          <p key={i} className="text-text-secondary leading-relaxed flex items-start gap-1.5 ml-4">
-            <span className={cn('font-mono font-bold shrink-0', it.color)}>{it.icon}</span> {it.text}
-          </p>
-        ))}
-      </div>
-      <div>
-        <span className="font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1 mb-1">
-          <TrendingUp className="w-3 h-3" /> Fibonacci
-        </span>
-        {fibItems.map((it, i) => (
           <p key={i} className="text-text-secondary leading-relaxed flex items-start gap-1.5 ml-4">
             <span className={cn('font-mono font-bold shrink-0', it.color)}>{it.icon}</span> {it.text}
           </p>
@@ -644,97 +602,6 @@ function TimeframeDetail({ rec, price, t, v2Data, htfDirection }: { rec: Trading
   )
 }
 
-function classColor(classification: string | null) {
-  switch (classification) {
-    case 'critical': return 'text-red-400'
-    case 'strong': return 'text-yellow-400'
-    case 'moderate': return 'text-green-400'
-    default: return 'text-text-muted'
-  }
-}
-
-function strengthDot(classification: string | null) {
-  switch (classification) {
-    case 'critical': return 'bg-red-400'
-    case 'strong': return 'bg-yellow-400'
-    case 'moderate': return 'bg-green-400'
-    default: return 'bg-text-muted/40'
-  }
-}
-
-function LevelMapSection({ levels, currentPrice, t }: { levels: PriceLevelType[]; currentPrice: number; t: (k: string) => string }) {
-  const above = levels
-    .filter((l) => l.price > currentPrice)
-    .sort((a, b) => a.price - b.price)
-    .slice(0, 6)
-  const below = levels
-    .filter((l) => l.price < currentPrice)
-    .sort((a, b) => b.price - a.price)
-    .slice(0, 6)
-
-  if (above.length === 0 && below.length === 0) return null
-
-  return (
-    <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-      <h3 className="text-xs font-display font-semibold text-text-secondary mb-3 flex items-center gap-2">
-        <Layers className="w-4 h-4 text-accent-btc" />
-        {t('trading.levelMap')}
-      </h3>
-      <div className="space-y-1">
-        {/* Resistance levels above */}
-        {above.reverse().map((lv) => (
-          <LevelMapRow key={lv.id} level={lv} currentPrice={currentPrice} />
-        ))}
-
-        {/* Current price marker */}
-        <div className="flex items-center gap-2 py-1.5 px-3 rounded-lg bg-accent-btc/15 border border-accent-btc/30">
-          <Bitcoin className="w-3.5 h-3.5 text-accent-btc" />
-          <span className="font-mono text-sm font-bold text-accent-btc flex-1">
-            {formatPrice(currentPrice)}
-          </span>
-          <span className="text-[10px] text-accent-btc font-mono">{t('trading.currentPrice')}</span>
-        </div>
-
-        {/* Support levels below */}
-        {below.map((lv) => (
-          <LevelMapRow key={lv.id} level={lv} currentPrice={currentPrice} />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function LevelMapRow({ level, currentPrice }: { level: PriceLevelType; currentPrice: number }) {
-  const dist = ((level.price - currentPrice) / currentPrice * 100).toFixed(1)
-  const cls = level.classification
-  const badges: string[] = []
-  if (level.is_role_flip) badges.push('Flip')
-  if (level.is_psychological) badges.push('Psych')
-  if (level.is_high_volume) badges.push('Vol')
-  if (level.fib_level) badges.push(`Fib ${level.fib_level}`)
-
-  return (
-    <div className="flex items-center gap-2 py-1 px-3 rounded-lg hover:bg-bg-tertiary/30">
-      <div className={cn('w-2 h-2 rounded-full flex-shrink-0', strengthDot(cls))} />
-      <span className="font-mono text-xs w-24 text-right">{formatPrice(level.price)}</span>
-      <span className={cn('text-[10px] w-16 text-center font-semibold', classColor(cls))}>
-        {level.strength}/20
-      </span>
-      <span className={cn('text-[10px] w-12', level.type === 'support' ? 'text-bullish' : 'text-bearish')}>
-        {level.type === 'support' ? 'S' : 'R'}
-      </span>
-      <div className="flex gap-1 flex-1 overflow-hidden">
-        {badges.map((b) => (
-          <span key={b} className="text-[9px] bg-bg-tertiary/60 text-text-muted px-1 py-0.5 rounded flex-shrink-0">{b}</span>
-        ))}
-      </div>
-      <span className={cn('text-[10px] font-mono w-12 text-right', Number(dist) > 0 ? 'text-bearish' : 'text-bullish')}>
-        {Number(dist) > 0 ? '+' : ''}{dist}%
-      </span>
-    </div>
-  )
-}
-
 export default function Trading() {
   const { t, ta } = useI18n()
   const { data: prices, loading: priceLoading } = usePriceChanges()
@@ -784,7 +651,7 @@ export default function Trading() {
   const { data: confluences } = useConfluenceZones()
 
   // v2: Latest signal history (for candle patterns, setup type)
-  const { data: signalHistoryRaw } = useSignalHistory(10)
+  const { data: signalHistoryRaw } = useSignalHistory(50)
   const latestV2Signals = useMemo(() => {
     if (!signalHistoryRaw) return null
     const byTf = new Map<string, typeof signalHistoryRaw[0]>()
@@ -850,19 +717,31 @@ export default function Trading() {
         )}
       </div>
 
-      {/* Level Map */}
-      {priceLevels && priceLevels.length > 0 && (
-        <LevelMapSection levels={priceLevels} currentPrice={currentPrice} t={t} />
-      )}
+      {/* Classification legend */}
+      <div className="rounded-xl bg-bg-secondary/60 border border-border p-3 backdrop-blur-sm">
+        <div className="flex items-center flex-wrap gap-x-4 gap-y-1 text-[10px] font-mono justify-center">
+          <span className="text-text-muted mr-1">{t('trading.signalQuality')}:</span>
+          <span className="text-yellow-400 font-bold">PREMIUM <span className="text-text-muted font-normal">&ge;85%</span></span>
+          <span className="text-green-400 font-bold">STRONG <span className="text-text-muted font-normal">&ge;70%</span></span>
+          <span className="text-blue-400 font-bold">VALID <span className="text-text-muted font-normal">&ge;55%</span></span>
+          <span className="text-orange-400 font-bold">WEAK <span className="text-text-muted font-normal">&ge;40%</span></span>
+          <span className="text-red-400 font-bold">NO ENTRY <span className="text-text-muted font-normal">&lt;40%</span></span>
+        </div>
+      </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {recommendations.map((rec) => (
+        {recommendations.map((rec) => {
+          const signalDate = latestV2Signals?.find(s => s.timeframe === rec.timeframe)?.date
+          return (
           <div key={rec.timeframe} className={cn('rounded-xl border p-4 backdrop-blur-sm', directionBg(rec.direction))}>
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1">
               <span className="text-sm font-mono text-text-muted">{rec.timeframe}</span>
               <span className="text-[10px] text-text-muted">{t(`trading.${rec.timeframe}`)}</span>
             </div>
+            {signalDate && (
+              <div className="text-[10px] text-text-muted font-mono text-center mb-1">{formatTimestamp(signalDate)}</div>
+            )}
             <div className={cn('flex items-center justify-center gap-1.5 font-bold text-2xl mb-1', directionColor(rec.direction))}>
               <DirectionIcon direction={rec.direction} className="w-7 h-7" />
               <span>{rec.direction}</span>
@@ -898,7 +777,8 @@ export default function Trading() {
               {rec.neutralCount > 0 && <span className="text-neutral-signal">{rec.neutralCount} {t('trading.flat')}</span>}
             </div>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Active signals chips */}

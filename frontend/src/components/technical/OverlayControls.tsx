@@ -6,13 +6,12 @@ export interface Overlays {
   bb: boolean
   sr: boolean
   fib: boolean
-  patterns: boolean
   volume: boolean
 }
 
 const STORAGE_KEY = 'btc-intel-overlays'
 
-const DEFAULTS: Overlays = { emas: true, bb: false, sr: true, fib: true, patterns: false, volume: false }
+const DEFAULTS: Overlays = { emas: true, bb: false, sr: true, fib: true, volume: false }
 
 function loadOverlays(): Overlays {
   try {
@@ -41,7 +40,7 @@ interface Props {
   onToggle: (key: keyof Overlays) => void
 }
 
-const KEYS: (keyof Overlays)[] = ['emas', 'bb', 'sr', 'fib', 'patterns', 'volume']
+const KEYS: (keyof Overlays)[] = ['emas', 'bb', 'sr', 'fib', 'volume']
 
 export default function OverlayControls({ overlays, onToggle }: Props) {
   const { t } = useI18n()

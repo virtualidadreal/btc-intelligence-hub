@@ -27,13 +27,15 @@ export function useSignalAccuracy() {
           // Use v2 outcome field first, fall back to legacy outcome_1h
           const outcome = s.outcome ?? s.outcome_1h
           if (!outcome || outcome === 'pending') continue
+          // Only count signals with TP/SL evaluation (skip legacy correct/incorrect)
+          if (outcome !== 'tp1_hit' && outcome !== 'tp2_hit' && outcome !== 'sl_hit') continue
 
           if (!byTf[s.timeframe]) {
             byTf[s.timeframe] = { correct: 0, incorrect: 0, tp2: 0, total: 0 }
           }
           byTf[s.timeframe].total++
 
-          if (outcome === 'tp1_hit' || outcome === 'tp2_hit' || outcome === 'correct') {
+          if (outcome === 'tp1_hit' || outcome === 'tp2_hit') {
             byTf[s.timeframe].correct++
             if (outcome === 'tp2_hit') byTf[s.timeframe].tp2++
           } else {

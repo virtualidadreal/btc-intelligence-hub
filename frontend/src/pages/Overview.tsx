@@ -11,10 +11,12 @@ import { usePriceChanges } from '../hooks/usePrices'
 import { useBinancePrice } from '../hooks/useBinancePrice'
 import { useLatestCycleScore } from '../hooks/useCycleScore'
 import { useLatestSignals, useLatestIndicators, useTradingRecommendations } from '../hooks/useTechnical'
-import type { TradingRecommendation } from '../hooks/useTechnical'
+import type { TradingRecommendation, V2TradingData } from '../hooks/useTechnical'
 import { useLatestSentiment } from '../hooks/useSentiment'
+import { useSignalHistory } from '../hooks/useSignalHistory'
 import { useActiveAlerts } from '../hooks/useAlerts'
 import { useConclusions } from '../hooks/useConclusions'
+import { usePriceLevels, useFibonacciLevels, useConfluenceZones } from '../hooks/useLevels'
 import { useSupabaseQuery, supabase } from '../hooks/useSupabase'
 import type { OnchainMetric } from '../lib/types'
 import { formatPrice, formatPercent, cn } from '../lib/utils'
@@ -38,18 +40,30 @@ function DirectionIcon({ direction }: { direction: string }) {
   return <Minus className="w-5 h-5" />
 }
 
+function classificationColor(cls: string) {
+  switch (cls) {
+    case 'PREMIUM': return 'text-yellow-400'
+    case 'STRONG': return 'text-green-400'
+    case 'VALID': return 'text-blue-400'
+    case 'WEAK': return 'text-orange-400'
+    case 'NO ENTRY': return 'text-red-400'
+    default: return 'text-text-muted'
+  }
+}
+
 function RecommendationCard({ rec }: { rec: TradingRecommendation }) {
   return (
     <div className={cn('rounded-lg border p-3', directionBg(rec.direction))}>
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-mono text-text-muted">{rec.timeframe}</span>
+        <span className={cn('text-[10px] font-bold font-mono', classificationColor(rec.classification))}>{rec.classification}</span>
       </div>
       <div className={cn('flex items-center justify-center gap-1.5 font-bold text-lg', directionColor(rec.direction))}>
         <DirectionIcon direction={rec.direction} />
         <span>{rec.direction}</span>
       </div>
       <div className="text-center mt-1">
-        <span className={cn('text-sm font-mono font-bold', directionColor(rec.direction))}>{rec.confidence}%</span>
+        <span className={cn('text-sm font-mono font-bold', directionColor(rec.direction))}>{rec.extendedScore}%</span>
       </div>
       {rec.levels && (
         <div className="mt-2 pt-2 border-t border-border/50 space-y-0.5 text-[10px] font-mono">
@@ -100,6 +114,42 @@ export default function Overview() {
     return { hashRate, nvt }
   }, [onchainRaw])
 
+  // v2 data (same as Trading)
+  const { data: derivativesRaw } = useSupabaseQuery<OnchainMetric[]>(
+    () =>
+      supabase
+        .from('onchain_metrics')
+        .select('*')
+        .in('metric', ['FUNDING_RATE', 'OPEN_INTEREST'])
+        .order('date', { ascending: false })
+        .limit(4),
+    [],
+    'derivatives-trading-signals',
+  )
+  const fundingRate = useMemo(() => derivativesRaw?.find(m => m.metric === 'FUNDING_RATE') ?? null, [derivativesRaw])
+  const openInterest = useMemo(() => derivativesRaw?.find(m => m.metric === 'OPEN_INTEREST') ?? null, [derivativesRaw])
+  const { data: priceLevels } = usePriceLevels(5)
+  const { data: fibLevels } = useFibonacciLevels()
+  const { data: confluences } = useConfluenceZones()
+  const { data: signalHistoryRaw } = useSignalHistory(50)
+  const latestV2Signals = useMemo(() => {
+    if (!signalHistoryRaw) return null
+    const byTf = new Map<string, typeof signalHistoryRaw[0]>()
+    for (const s of signalHistoryRaw) {
+      if (!byTf.has(s.timeframe)) byTf.set(s.timeframe, s)
+    }
+    return Array.from(byTf.values())
+  }, [signalHistoryRaw])
+
+  const v2Data: V2TradingData = useMemo(() => ({
+    fundingRate,
+    openInterest,
+    priceLevels: priceLevels ?? null,
+    fibLevels: fibLevels ?? null,
+    confluences: confluences ?? null,
+    latestV2Signals,
+  }), [fundingRate, openInterest, priceLevels, fibLevels, confluences, latestV2Signals])
+
   const bbIndicators = useMemo(() => {
     if (!allIndicators) return null
     return allIndicators.filter((i) => i.indicator.startsWith('BB_'))
@@ -115,7 +165,7 @@ export default function Overview() {
   }, [prices])
 
   const currentPrice = (livePrice.isLive && livePrice.price > 0) ? livePrice.price : (priceData?.current ?? null)
-  const recommendations = useTradingRecommendations(signals, bbIndicators, sentiment, onchainMetrics, cycleScore, currentPrice, allIndicators)
+  const recommendations = useTradingRecommendations(signals, bbIndicators, sentiment, onchainMetrics, cycleScore, currentPrice, allIndicators, v2Data)
 
   const sparkline = useMemo(() => {
     if (!prices) return []

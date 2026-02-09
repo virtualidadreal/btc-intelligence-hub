@@ -304,7 +304,7 @@ function classifyScore(score: number): string {
   if (score >= 70) return 'STRONG'
   if (score >= 55) return 'VALID'
   if (score >= 40) return 'WEAK'
-  return 'NO ENTRAR'
+  return 'NO ENTRY'
 }
 
 // ── v2: Enhanced TP/SL with structural levels ───────────────────────────────

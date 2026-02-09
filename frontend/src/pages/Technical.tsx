@@ -16,15 +16,53 @@ import OverlayControls, { useOverlays } from '../components/technical/OverlayCon
 import { useIndicatorHistory, useLatestSignals } from '../hooks/useTechnical'
 import { usePriceHistory } from '../hooks/usePrices'
 import { usePriceLevels, useFibonacciLevels, useConfluenceZones } from '../hooks/useLevels'
+import { useBinanceKlines } from '../hooks/useBinanceKlines'
+import { useKlineIndicators } from '../hooks/useKlineIndicators'
 import { useI18n } from '../lib/i18n'
 
 /* ── Helpers ──────────────────────────────────────────────────── */
-const RANGE_DAYS: Record<string, number> = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, ALL: 9999 }
+const RANGE_DAYS: Record<string, number> = { '1D': 1, '3D': 3, '1W': 7, '2W': 14, '1M': 30, '3M': 90, '6M': 180, '1Y': 365, '2Y': 730, ALL: 9999 }
+
+const TF_RANGES: Record<string, { ranges: string[]; default: string }> = {
+  '1H': { ranges: ['1D', '3D', '1W', '2W'], default: '1W' },
+  '4H': { ranges: ['1W', '2W', '1M', '3M'], default: '1M' },
+  '1D': { ranges: ['1M', '3M', '6M', '1Y', 'ALL'], default: '1Y' },
+  '1W': { ranges: ['6M', '1Y', '2Y', 'ALL'], default: '1Y' },
+}
+
+const TIMEFRAMES = ['1H', '4H', '1D', '1W'] as const
 
 function sliceByRange<T>(data: T[], range: string): T[] {
   const days = RANGE_DAYS[range] || 365
   if (days >= data.length) return data
   return data.slice(-days)
+}
+
+function sliceByRangeHours<T>(data: T[], range: string, hoursPerCandle: number): T[] {
+  const days = RANGE_DAYS[range] || 365
+  const maxCandles = Math.ceil((days * 24) / hoursPerCandle)
+  if (maxCandles >= data.length) return data
+  return data.slice(-maxCandles)
+}
+
+function TfSelector({ active, onChange }: { active: string; onChange: (tf: string) => void }) {
+  return (
+    <div className="flex gap-1">
+      {TIMEFRAMES.map((tf) => (
+        <button
+          key={tf}
+          onClick={() => onChange(tf)}
+          className={`px-2 py-0.5 text-xs font-mono rounded transition-colors ${
+            active === tf
+              ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
+              : 'text-text-muted hover:text-text-secondary'
+          }`}
+        >
+          {tf}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function fmtDate(iso: string): string {
@@ -36,8 +74,13 @@ function fmtDate(iso: string): string {
 /* ── Main page ────────────────────────────────────────────────── */
 export default function Technical() {
   const { t, ta } = useI18n()
+  const [tf, setTf] = useState('1D')
   const [range, setRange] = useState('1Y')
   const { overlays, toggle } = useOverlays()
+
+  /* ── Binance klines (only for non-1D timeframes) ──────────── */
+  const { data: klines, loading: klinesLoading } = useBinanceKlines(tf === '1D' ? '' : tf)
+  const { rsi: klineRsi, macd: klineMacd } = useKlineIndicators(tf === '1D' ? null : klines)
 
   /* ── Data hooks ─────────────────────────────────────────────── */
   const { data: rsiData, loading } = useIndicatorHistory('RSI_14', 3000)
@@ -57,17 +100,38 @@ export default function Technical() {
   const { data: confluenceZones } = useConfluenceZones()
 
   const handleRange = useCallback((r: string) => setRange(r), [])
+  const handleTf = useCallback((newTf: string) => {
+    setTf(newTf)
+    setRange(TF_RANGES[newTf]?.default || '1Y')
+  }, [])
 
   /* ── Format helpers ─────────────────────────────────────────── */
   const formatAxisDate = useCallback((iso: string) => {
-    if (!iso || !iso.includes('-')) return iso || ''
+    if (!iso) return ''
+    // ISO datetime from Binance (contains T)
+    if (iso.includes('T')) {
+      const d = new Date(iso)
+      if (tf === '1H' || tf === '4H') {
+        return `${d.getDate()}/${d.getMonth() + 1} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+      }
+      return `${d.getDate()}/${d.getMonth() + 1}`
+    }
+    // Daily date from Supabase (YYYY-MM-DD)
+    if (!iso.includes('-')) return iso
     const [y, m, d] = iso.split('-')
     if (range === '1M' || range === '3M') return `${d}/${m}`
     return `${m}/${y.slice(2)}`
-  }, [range])
+  }, [range, tf])
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const formatTooltipLabel = useCallback((label: any) => (label ? fmtDate(String(label)) : ''), [])
+  const formatTooltipLabel = useCallback((label: unknown) => {
+    if (!label) return ''
+    const s = String(label)
+    if (s.includes('T')) {
+      const d = new Date(s)
+      return `${d.getDate()}/${d.getMonth() + 1}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    }
+    return fmtDate(s)
+  }, [])
 
   /* ── Indicator maps ─────────────────────────────────────────── */
   const ema21Map = useMemo(() => new Map(ema21Data?.map((d) => [d.date, d.value]) || []), [ema21Data])
@@ -96,8 +160,18 @@ export default function Technical() {
     }))
   }, [macdData, macdSignalData, macdHistData])
 
-  const macdChart = useMemo(() => sliceByRange(fullMacd, range), [fullMacd, range])
-  const rsiChart = useMemo(() => sliceByRange(fullRsi, range), [fullRsi, range])
+  /* ── Choose data source: Supabase (1D) vs Binance klines ──── */
+  const hoursPerCandle: Record<string, number> = { '1H': 1, '4H': 4, '1D': 24, '1W': 168 }
+
+  const rsiChart = useMemo(() => {
+    if (tf === '1D') return sliceByRange(fullRsi, range)
+    return sliceByRangeHours(klineRsi, range, hoursPerCandle[tf] || 24)
+  }, [tf, fullRsi, klineRsi, range])
+
+  const macdChart = useMemo(() => {
+    if (tf === '1D') return sliceByRange(fullMacd, range)
+    return sliceByRangeHours(klineMacd, range, hoursPerCandle[tf] || 24)
+  }, [tf, fullMacd, klineMacd, range])
 
   const crosses = useMemo(() => {
     const pts: { date: string; macd: number; type: 'bullish' | 'bearish' }[] = []
@@ -201,31 +275,48 @@ export default function Technical() {
           bbLowerMap={bbLowerMap}
           levels={levels || []}
           fibLevels={fibLevels || []}
-          confluenceZones={confluenceZones || []}
           overlays={overlays}
           range={range}
-          formatAxisDate={formatAxisDate}
-          formatTooltipLabel={formatTooltipLabel}
         />
       </ChartContainer>
 
       {/* ── RSI Chart ─────────────────────────────────────────── */}
-      <ChartContainer title={t('technical.rsi')} activeRange={range} onTimeRangeChange={handleRange}>
-        <RsiChart
-          data={rsiChart}
-          formatAxisDate={formatAxisDate}
-          formatTooltipLabel={formatTooltipLabel}
-        />
+      <ChartContainer
+        title={t('technical.rsi')}
+        activeRange={range}
+        onTimeRangeChange={handleRange}
+        timeRanges={TF_RANGES[tf].ranges}
+        extraControls={<TfSelector active={tf} onChange={handleTf} />}
+      >
+        {tf !== '1D' && klinesLoading ? (
+          <div className="h-40 flex items-center justify-center text-text-muted text-sm">Loading {tf} data...</div>
+        ) : (
+          <RsiChart
+            data={rsiChart}
+            formatAxisDate={formatAxisDate}
+            formatTooltipLabel={formatTooltipLabel}
+          />
+        )}
       </ChartContainer>
 
       {/* ── MACD Chart ────────────────────────────────────────── */}
-      <ChartContainer title={t('technical.macd')} activeRange={range} onTimeRangeChange={handleRange}>
-        <MacdChart
-          data={macdChart}
-          crosses={crosses}
-          formatAxisDate={formatAxisDate}
-          formatTooltipLabel={formatTooltipLabel}
-        />
+      <ChartContainer
+        title={t('technical.macd')}
+        activeRange={range}
+        onTimeRangeChange={handleRange}
+        timeRanges={TF_RANGES[tf].ranges}
+        extraControls={<TfSelector active={tf} onChange={handleTf} />}
+      >
+        {tf !== '1D' && klinesLoading ? (
+          <div className="h-44 flex items-center justify-center text-text-muted text-sm">Loading {tf} data...</div>
+        ) : (
+          <MacdChart
+            data={macdChart}
+            crosses={crosses}
+            formatAxisDate={formatAxisDate}
+            formatTooltipLabel={formatTooltipLabel}
+          />
+        )}
       </ChartContainer>
 
       {/* ── Level Map + Confluence — side by side ─────────────── */}

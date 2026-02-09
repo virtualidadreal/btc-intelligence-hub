@@ -190,6 +190,117 @@ def validate(conclusion_id: int, outcome: str, notes: str | None = None) -> dict
     return {}
 
 
+def auto_conclude():
+    """Generate automatic conclusions based on current data state.
+
+    Called by `analyze full` to keep conclusions fresh daily.
+    Only creates conclusions if none exist for today.
+    """
+    db = get_supabase()
+    today = str(date.today())
+
+    # Check if we already have conclusions for today
+    existing = (
+        db.table("conclusions")
+        .select("id")
+        .eq("date", today)
+        .eq("source", "system")
+        .limit(1)
+        .execute()
+    )
+    if existing.data:
+        console.print("  [dim]Today's conclusions already exist, skipping[/dim]")
+        return
+
+    snapshot = _get_data_snapshot(db)
+    btc_price = snapshot.get("btc_price", 0)
+    rsi = snapshot.get("rsi", 50)
+    fg = snapshot.get("fear_greed", 50)
+    cycle_score = snapshot.get("cycle_score", 50)
+    phase = snapshot.get("phase", "unknown")
+
+    conclusions = []
+
+    # Technical conclusion
+    if rsi < 30:
+        conclusions.append({
+            "category": "technical",
+            "title": f"RSI en sobreventa extrema ({rsi:.0f})",
+            "content": f"RSI_14 en {rsi:.1f}, zona de sobreventa. Históricamente, niveles por debajo de 30 han precedido rebotes a corto plazo. BTC a ${btc_price:,.0f}.",
+            "confidence": 7,
+        })
+    elif rsi > 70:
+        conclusions.append({
+            "category": "technical",
+            "title": f"RSI en sobrecompra ({rsi:.0f})",
+            "content": f"RSI_14 en {rsi:.1f}, zona de sobrecompra. Posible corrección a corto plazo. BTC a ${btc_price:,.0f}.",
+            "confidence": 6,
+        })
+
+    # Sentiment conclusion
+    if fg <= 15:
+        conclusions.append({
+            "category": "sentiment",
+            "title": f"Miedo extremo — Fear & Greed en {fg}",
+            "content": f"Fear & Greed Index en {fg}/100, nivel de miedo extremo. Históricamente señal contrarian de compra a medio plazo.",
+            "confidence": 7,
+        })
+    elif fg >= 80:
+        conclusions.append({
+            "category": "sentiment",
+            "title": f"Avaricia extrema — Fear & Greed en {fg}",
+            "content": f"Fear & Greed Index en {fg}/100, nivel de avaricia extrema. Precaución: posible techo a corto plazo.",
+            "confidence": 6,
+        })
+
+    # Cycle conclusion
+    conclusions.append({
+        "category": "cycle",
+        "title": f"Cycle Score {cycle_score}/100 — Fase: {phase}",
+        "content": f"Cycle Score en {cycle_score}/100 (fase {phase}). BTC a ${btc_price:,.0f}. " +
+                   ("Zona de acumulación histórica." if cycle_score < 30 else
+                    "Tendencia alcista temprana." if cycle_score < 50 else
+                    "Zona neutral del ciclo." if cycle_score < 70 else
+                    "Zona de distribución, precaución."),
+        "confidence": 6,
+    })
+
+    # Price level conclusion
+    prices = db.table("btc_prices").select("close").order("date", desc=True).limit(8).execute()
+    if prices.data and len(prices.data) >= 7:
+        week_ago_price = float(prices.data[6]["close"])
+        pct_week = ((btc_price - week_ago_price) / week_ago_price) * 100
+        if abs(pct_week) > 5:
+            direction = "subido" if pct_week > 0 else "bajado"
+            conclusions.append({
+                "category": "general",
+                "title": f"BTC ha {direction} {abs(pct_week):.1f}% en 7 días",
+                "content": f"Precio de ${week_ago_price:,.0f} a ${btc_price:,.0f} ({pct_week:+.1f}%). Movimiento significativo que requiere atención.",
+                "confidence": 8,
+            })
+
+    created = 0
+    for c in conclusions:
+        record = {
+            "date": today,
+            "title": c["title"],
+            "content": c["content"],
+            "category": c["category"],
+            "confidence": c["confidence"],
+            "source": "system",
+            "tags": ["auto"],
+            "status": "active",
+            "data_snapshot": snapshot,
+        }
+        try:
+            db.table("conclusions").insert(record).execute()
+            created += 1
+        except Exception as e:
+            console.print(f"  [yellow]Error creating conclusion: {e}[/yellow]")
+
+    console.print(f"  [green]{created} auto-conclusions created for {today}[/green]")
+
+
 def archive(conclusion_id: int):
     """Archive a conclusion."""
     db = get_supabase()

@@ -10,9 +10,30 @@ from btc_intel.db import get_supabase
 console = Console()
 
 
-def generate_report(type_: str = "daily", title: str | None = None) -> str:
-    """Generate a report and save it to Supabase."""
+def generate_report(type_: str = "daily", title: str | None = None,
+                    skip_if_exists: bool = False) -> str:
+    """Generate a report and save it to Supabase.
+
+    Args:
+        skip_if_exists: If True, skip generation if a report of this type
+                        already exists for today. Used by automated crons.
+    """
     db = get_supabase()
+    today = date.today()
+
+    # Deduplication: skip if report already exists for today
+    if skip_if_exists:
+        existing = (
+            db.table("reports")
+            .select("id")
+            .eq("report_type", type_)
+            .eq("period_end", str(today))
+            .limit(1)
+            .execute()
+        )
+        if existing.data:
+            console.print(f"  [dim]{type_.capitalize()} report already exists for {today}, skipping[/dim]")
+            return ""
 
     generators = {
         "daily": _generate_daily,
@@ -25,10 +46,9 @@ def generate_report(type_: str = "daily", title: str | None = None) -> str:
         return ""
 
     report_content = generators[type_](db)
-    report_title = title or f"{type_.capitalize()} Report — {date.today()}"
+    report_title = title or f"{type_.capitalize()} Report — {today}"
 
     # Calculate period
-    today = date.today()
     if type_ == "weekly":
         period_start = str(today - timedelta(days=7))
     else:

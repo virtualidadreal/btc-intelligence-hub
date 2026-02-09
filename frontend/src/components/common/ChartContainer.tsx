@@ -6,6 +6,7 @@ interface ChartContainerProps {
   timeRanges?: string[]
   activeRange?: string
   onTimeRangeChange?: (range: string) => void
+  extraControls?: React.ReactNode
 }
 
 const DEFAULT_RANGES = ['1M', '3M', '6M', '1Y', 'ALL']
@@ -16,6 +17,7 @@ export default function ChartContainer({
   timeRanges = DEFAULT_RANGES,
   activeRange,
   onTimeRangeChange,
+  extraControls,
 }: ChartContainerProps) {
   const [localActive, setLocalActive] = useState('1Y')
   const active = activeRange ?? localActive
@@ -28,7 +30,10 @@ export default function ChartContainer({
   return (
     <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="font-display font-semibold text-text-primary">{title}</h3>
+        <div className="flex items-center gap-3">
+          <h3 className="font-display font-semibold text-text-primary">{title}</h3>
+          {extraControls}
+        </div>
         <div className="flex gap-1">
           {timeRanges.map((r) => (
             <button

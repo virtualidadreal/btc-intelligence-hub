@@ -212,6 +212,16 @@ def analyze(
         store_signal_snapshot()
         evaluate_past_signals()
 
+        # Daily report + auto-conclusions (once per day, skips if already done)
+        console.print(f"\n[bold]--- DAILY REPORT ---[/bold]")
+        try:
+            from btc_intel.reports.generator import generate_report
+            from btc_intel.conclusions.manager import auto_conclude
+            auto_conclude()
+            generate_report(type_="daily", skip_if_exists=True)
+        except Exception as e:
+            console.print(f"  [yellow]Report/conclusions error: {e}[/yellow]")
+
         console.print("\n[bold green]═══ Full analysis completed ═══[/bold green]")
     elif area in engines:
         engines[area]()

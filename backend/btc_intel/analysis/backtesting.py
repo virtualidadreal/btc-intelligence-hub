@@ -187,7 +187,18 @@ def store_signal_snapshot():
             ).execute()
             snapshots += 1
         except Exception as e:
-            console.print(f"  [yellow]Error storing {tf} snapshot: {e}[/yellow]")
+            # If classification column doesn't exist yet, retry without it
+            if "classification" in str(e):
+                record.pop("classification", None)
+                try:
+                    db.table("signal_history").upsert(
+                        record, on_conflict="date,timeframe"
+                    ).execute()
+                    snapshots += 1
+                except Exception as e2:
+                    console.print(f"  [yellow]Error storing {tf} snapshot: {e2}[/yellow]")
+            else:
+                console.print(f"  [yellow]Error storing {tf} snapshot: {e}[/yellow]")
 
     console.print(f"  [green]{snapshots} signal snapshots stored (price: ${current_price:,.0f})[/green]")
 

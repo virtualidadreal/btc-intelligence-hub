@@ -527,6 +527,7 @@ const S: Record<Lang, Record<string, string>> = {
     // Level Map
     'trading.levelMap': 'Mapa de Niveles — S/R + Fibonacci + Volumen',
 
+    'trading.signalQuality': 'Calidad de señal',
     // Backtesting / Signal History
     'trading.signalAccuracy': 'Precision de Señales',
     'trading.winRate': 'Win Rate',
@@ -1130,6 +1131,7 @@ const S: Record<Lang, Record<string, string>> = {
     // Level Map
     'trading.levelMap': 'Level Map — S/R + Fibonacci + Volume',
 
+    'trading.signalQuality': 'Signal quality',
     // Backtesting / Signal History
     'trading.signalAccuracy': 'Signal Accuracy',
     'trading.winRate': 'Win Rate',
