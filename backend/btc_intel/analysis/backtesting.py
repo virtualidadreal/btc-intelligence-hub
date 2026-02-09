@@ -162,10 +162,24 @@ def store_signal_snapshot():
                 record["tp1_method"] = tpsl.get("tp1_method", "")
                 record["tp2_method"] = tpsl.get("tp2_method", "")
 
-        # Skip NO ENTRY signals (NEUTRAL direction or score < 40)
+        # Classify signal quality
         final_score = record.get("extended_score") or confidence
-        if direction == "NEUTRAL" or final_score < 40:
+        if final_score >= 85:
+            classification = "PREMIUM"
+        elif final_score >= 70:
+            classification = "STRONG"
+        elif final_score >= 55:
+            classification = "VALID"
+        elif final_score >= 40:
+            classification = "WEAK"
+        else:
+            classification = "NO ENTRY"
+
+        # Skip NEUTRAL, WEAK and NO ENTRY — we don't trade those
+        if direction == "NEUTRAL" or final_score < 55:
             continue
+
+        record["classification"] = classification
 
         try:
             db.table("signal_history").upsert(

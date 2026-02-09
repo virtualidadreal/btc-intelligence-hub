@@ -148,6 +148,7 @@ export interface SignalHistory {
   extended_score: number | null
   nearby_levels: Record<string, unknown>[] | null
   fib_context: Record<string, unknown> | null
+  classification: string | null
   outcome: string | null
   hit_at: string | null
   created_at: string
