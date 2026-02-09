@@ -8,18 +8,14 @@ import EmptyState from '../components/common/EmptyState'
 import PageHeader from '../components/common/PageHeader'
 import HelpButton from '../components/common/HelpButton'
 import { usePriceChanges } from '../hooks/usePrices'
-import { useBinancePrice } from '../hooks/useBinancePrice'
 import { useLatestCycleScore } from '../hooks/useCycleScore'
-import { useLatestSignals, useLatestIndicators, useTradingRecommendations } from '../hooks/useTechnical'
-import type { TradingRecommendation, V2TradingData } from '../hooks/useTechnical'
+import { useLatestSignals } from '../hooks/useTechnical'
 import { useLatestSentiment } from '../hooks/useSentiment'
 import { useSignalHistory } from '../hooks/useSignalHistory'
 import { useActiveAlerts } from '../hooks/useAlerts'
 import { useConclusions } from '../hooks/useConclusions'
-import { usePriceLevels, useFibonacciLevels, useConfluenceZones } from '../hooks/useLevels'
-import { useSupabaseQuery, supabase } from '../hooks/useSupabase'
-import type { OnchainMetric } from '../lib/types'
-import { formatPrice, formatPercent, cn } from '../lib/utils'
+import type { SignalHistory } from '../lib/types'
+import { formatPrice, formatPercent, formatTimestamp, cn } from '../lib/utils'
 import { useI18n } from '../lib/i18n'
 
 function directionColor(dir: string) {
@@ -40,35 +36,59 @@ function DirectionIcon({ direction }: { direction: string }) {
   return <Minus className="w-5 h-5" />
 }
 
-function classificationColor(cls: string) {
+function classificationBg(cls: string) {
   switch (cls) {
-    case 'PREMIUM': return 'text-yellow-400'
-    case 'STRONG': return 'text-green-400'
-    case 'VALID': return 'text-blue-400'
-    case 'WEAK': return 'text-orange-400'
-    case 'NO ENTRY': return 'text-red-400'
-    default: return 'text-text-muted'
+    case 'PREMIUM': return 'bg-yellow-400/15 border-yellow-400/30 text-yellow-400'
+    case 'STRONG': return 'bg-green-400/15 border-green-400/30 text-green-400'
+    case 'VALID': return 'bg-blue-400/15 border-blue-400/30 text-blue-400'
+    default: return 'bg-bg-tertiary border-border text-text-muted'
   }
 }
 
-function RecommendationCard({ rec }: { rec: TradingRecommendation }) {
-  return (
-    <div className={cn('rounded-lg border p-3', directionBg(rec.direction))}>
-      <div className="flex items-center justify-between mb-1">
-        <span className="text-xs font-mono text-text-muted">{rec.timeframe}</span>
-        <span className={cn('text-[10px] font-bold font-mono', classificationColor(rec.classification))}>{rec.classification}</span>
+function classifyScore(score: number): string {
+  if (score >= 85) return 'PREMIUM'
+  if (score >= 70) return 'STRONG'
+  if (score >= 55) return 'VALID'
+  if (score >= 40) return 'WEAK'
+  return 'NO ENTRY'
+}
+
+function SignalCard({ sig, tf, t }: { sig: SignalHistory | null; tf: string; t: (k: string) => string }) {
+  if (!sig) {
+    return (
+      <div className="rounded-lg border border-border/50 p-3 bg-bg-secondary/30">
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs font-mono text-text-muted">{tf}</span>
+        </div>
+        <div className="flex items-center justify-center gap-1 text-text-muted text-sm font-bold py-1.5">
+          <Minus className="w-4 h-4" />
+          <span>{t('trading.noSignal') || 'NO SIGNAL'}</span>
+        </div>
       </div>
-      <div className={cn('flex items-center justify-center gap-1.5 font-bold text-lg', directionColor(rec.direction))}>
-        <DirectionIcon direction={rec.direction} />
-        <span>{rec.direction}</span>
+    )
+  }
+
+  const extScore = sig.extended_score ?? sig.confidence
+  const cls = sig.classification || classifyScore(extScore)
+
+  return (
+    <div className={cn('rounded-lg border p-3', directionBg(sig.direction))}>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-mono text-text-muted">{sig.timeframe}</span>
+        <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border', classificationBg(cls))}>{cls}</span>
+      </div>
+      {sig.date && <div className="text-[9px] text-text-muted font-mono text-center mb-0.5">{formatTimestamp(sig.date)}</div>}
+      <div className={cn('flex items-center justify-center gap-1.5 font-bold text-lg', directionColor(sig.direction))}>
+        <DirectionIcon direction={sig.direction} />
+        <span>{sig.direction}</span>
       </div>
       <div className="text-center mt-1">
-        <span className={cn('text-sm font-mono font-bold', directionColor(rec.direction))}>{rec.extendedScore}%</span>
+        <span className={cn('text-sm font-mono font-bold', directionColor(sig.direction))}>{extScore}%</span>
       </div>
-      {rec.levels && (
+      {sig.tp1 && sig.sl && (
         <div className="mt-2 pt-2 border-t border-border/50 space-y-0.5 text-[10px] font-mono">
-          <div className="flex justify-between"><span className="text-bullish">TP1</span><span>{formatPrice(rec.levels.tp1)}</span></div>
-          <div className="flex justify-between"><span className="text-bearish">SL</span><span>{formatPrice(rec.levels.sl)}</span></div>
+          <div className="flex justify-between"><span className="text-bullish">TP1</span><span>{formatPrice(sig.tp1)}</span></div>
+          <div className="flex justify-between"><span className="text-bearish">SL</span><span>{formatPrice(sig.sl)}</span></div>
         </div>
       )}
     </div>
@@ -78,10 +98,8 @@ function RecommendationCard({ rec }: { rec: TradingRecommendation }) {
 export default function Overview() {
   const { t, ta } = useI18n()
   const { data: prices, loading: priceLoading } = usePriceChanges()
-  const livePrice = useBinancePrice()
   const { data: cycleScore } = useLatestCycleScore()
   const { data: signals } = useLatestSignals()
-  const { data: allIndicators } = useLatestIndicators()
   const { data: sentiment } = useLatestSentiment()
   const { data: alerts } = useActiveAlerts()
   const { data: conclusions } = useConclusions(undefined, 3)
@@ -96,41 +114,7 @@ export default function Overview() {
     euphoria: t('phase.euphoria'),
   }
 
-  const { data: onchainRaw } = useSupabaseQuery<OnchainMetric[]>(
-    () =>
-      supabase
-        .from('onchain_metrics')
-        .select('*')
-        .in('metric', ['HASH_RATE_MOM', 'NVT_RATIO'])
-        .order('date', { ascending: false })
-        .limit(4),
-    [],
-    'onchain-trading-signals',
-  )
-
-  const onchainMetrics = useMemo(() => {
-    const hashRate = onchainRaw?.find((m) => m.metric === 'HASH_RATE_MOM') ?? null
-    const nvt = onchainRaw?.find((m) => m.metric === 'NVT_RATIO') ?? null
-    return { hashRate, nvt }
-  }, [onchainRaw])
-
-  // v2 data (same as Trading)
-  const { data: derivativesRaw } = useSupabaseQuery<OnchainMetric[]>(
-    () =>
-      supabase
-        .from('onchain_metrics')
-        .select('*')
-        .in('metric', ['FUNDING_RATE', 'OPEN_INTEREST'])
-        .order('date', { ascending: false })
-        .limit(4),
-    [],
-    'derivatives-trading-signals',
-  )
-  const fundingRate = useMemo(() => derivativesRaw?.find(m => m.metric === 'FUNDING_RATE') ?? null, [derivativesRaw])
-  const openInterest = useMemo(() => derivativesRaw?.find(m => m.metric === 'OPEN_INTEREST') ?? null, [derivativesRaw])
-  const { data: priceLevels } = usePriceLevels(5)
-  const { data: fibLevels } = useFibonacciLevels()
-  const { data: confluences } = useConfluenceZones()
+  // Signal history for trading cards (single source of truth)
   const { data: signalHistoryRaw } = useSignalHistory(50)
   const latestV2Signals = useMemo(() => {
     if (!signalHistoryRaw) return null
@@ -141,20 +125,6 @@ export default function Overview() {
     return Array.from(byTf.values())
   }, [signalHistoryRaw])
 
-  const v2Data: V2TradingData = useMemo(() => ({
-    fundingRate,
-    openInterest,
-    priceLevels: priceLevels ?? null,
-    fibLevels: fibLevels ?? null,
-    confluences: confluences ?? null,
-    latestV2Signals,
-  }), [fundingRate, openInterest, priceLevels, fibLevels, confluences, latestV2Signals])
-
-  const bbIndicators = useMemo(() => {
-    if (!allIndicators) return null
-    return allIndicators.filter((i) => i.indicator.startsWith('BB_'))
-  }, [allIndicators])
-
   const priceData = useMemo(() => {
     if (!prices || prices.length < 2) return null
     const current = prices[0].close
@@ -163,9 +133,6 @@ export default function Overview() {
     const month = prices.length > 30 ? ((current - prices[30].close) / prices[30].close) * 100 : 0
     return { current, day, week, month, date: prices[0].date }
   }, [prices])
-
-  const currentPrice = (livePrice.isLive && livePrice.price > 0) ? livePrice.price : (priceData?.current ?? null)
-  const recommendations = useTradingRecommendations(signals, bbIndicators, sentiment, onchainMetrics, cycleScore, currentPrice, allIndicators, v2Data)
 
   const sparkline = useMemo(() => {
     if (!prices) return []
@@ -250,35 +217,33 @@ export default function Overview() {
         </div>
       </div>
 
-      {/* Trading Signal Summary */}
-      {recommendations.length > 0 && (
-        <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="font-display font-semibold flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-accent-btc" /> {t('overview.tradingSignal')}
-            </h3>
-            <Link to="/trading" className="flex items-center gap-1 text-xs text-accent-btc hover:text-accent-btc/80 transition-colors">
-              {t('overview.seeDetail')} <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            {recommendations.map((rec) => (
-              <RecommendationCard key={rec.timeframe} rec={rec} />
+      {/* Trading Signal Summary — driven by signal_history */}
+      <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-display font-semibold flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-accent-btc" /> {t('overview.tradingSignal')}
+          </h3>
+          <Link to="/trading" className="flex items-center gap-1 text-xs text-accent-btc hover:text-accent-btc/80 transition-colors">
+            {t('overview.seeDetail')} <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {(['1H', '4H', '1D', '1W'] as const).map((tf) => (
+            <SignalCard key={tf} sig={latestV2Signals?.find(s => s.timeframe === tf) ?? null} tf={tf} t={t} />
+          ))}
+        </div>
+        {signals && signals.length > 0 && (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {signals.map((s) => (
+              <div key={s.indicator} className="flex items-center gap-2 bg-bg-tertiary/50 rounded-lg px-3 py-1.5">
+                <span className="text-xs font-mono text-text-secondary">{s.indicator}</span>
+                <span className="text-xs font-mono text-text-muted">{s.value != null ? s.value.toFixed(1) : ''}</span>
+                {s.signal && <SignalBadge signal={s.signal} />}
+              </div>
             ))}
           </div>
-          {signals && signals.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {signals.map((s) => (
-                <div key={s.indicator} className="flex items-center gap-2 bg-bg-tertiary/50 rounded-lg px-3 py-1.5">
-                  <span className="text-xs font-mono text-text-secondary">{s.indicator}</span>
-                  <span className="text-xs font-mono text-text-muted">{s.value != null ? s.value.toFixed(1) : ''}</span>
-                  {s.signal && <SignalBadge signal={s.signal} />}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Alerts + Conclusions Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
