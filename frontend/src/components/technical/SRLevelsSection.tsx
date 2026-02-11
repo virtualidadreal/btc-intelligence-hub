@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react'
 import { formatPrice, cn } from '../../lib/utils'
-import { useI18n } from '../../lib/i18n'
 import type { PriceLevel, FibonacciLevel, ConfluenceZone } from '../../lib/types'
 
 interface Props {
@@ -50,7 +49,6 @@ type Tab = 'map' | 'fibonacci' | 'confluence'
 /* ── Main Component ──────────────────────────────────────── */
 
 export default function SRLevelsSection({ levels, fibLevels, confluenceZones, currentPrice }: Props) {
-  const { t } = useI18n()
   const [tab, setTab] = useState<Tab>('map')
 
   return (
@@ -80,7 +78,7 @@ export default function SRLevelsSection({ levels, fibLevels, confluenceZones, cu
 
       {/* Content */}
       <div className="p-4">
-        {tab === 'map' && <PriceMap levels={levels} fibLevels={fibLevels} confluenceZones={confluenceZones} currentPrice={currentPrice} />}
+        {tab === 'map' && <PriceMap levels={levels} fibLevels={fibLevels} currentPrice={currentPrice} />}
         {tab === 'fibonacci' && <FibonacciTable fibLevels={fibLevels} currentPrice={currentPrice} />}
         {tab === 'confluence' && <ConfluenceView zones={confluenceZones} currentPrice={currentPrice} />}
       </div>
@@ -100,7 +98,7 @@ interface MapEntry {
   color: string
 }
 
-function PriceMap({ levels, fibLevels, confluenceZones, currentPrice }: Props) {
+function PriceMap({ levels, fibLevels, currentPrice }: Omit<Props, 'confluenceZones'>) {
   const entries = useMemo(() => {
     const items: MapEntry[] = []
 
@@ -214,7 +212,6 @@ function PriceMap({ levels, fibLevels, confluenceZones, currentPrice }: Props) {
 function MapRow({ entry, currentPrice }: { entry: MapEntry; currentPrice: number }) {
   const dist = ((entry.price - currentPrice) / currentPrice) * 100
   const isSupport = entry.price <= currentPrice
-  const hasFib = entry.badges.some((b) => b.startsWith('Fib') || b.startsWith('F'))
 
   return (
     <div
