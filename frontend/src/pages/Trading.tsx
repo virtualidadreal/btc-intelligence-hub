@@ -470,7 +470,7 @@ function TimeframeDetail({ rec, price, t, v2Data, htfDirection }: { rec: Trading
   const v2Signal = v2Data?.latestV2Signals?.find(s => s.timeframe === rec.timeframe)
 
   // Use backend values from signal_history when available (single source of truth)
-  const displayScore = v2Signal?.extended_score ?? rec.extendedScore
+  const displayScore = v2Signal?.confidence ?? rec.confidence
   const displayClassification = v2Signal?.classification || rec.classification
   const displayConfidence = v2Signal?.confidence ?? rec.confidence
   const displayBonusLevels = v2Signal?.level_score ?? rec.bonusLevels
@@ -775,7 +775,7 @@ export default function Trading() {
           }
 
           const direction = sig.direction
-          const extScore = sig.extended_score ?? sig.confidence
+          const extScore = sig.confidence ?? sig.extended_score
           const cls = sig.classification || classifyScore(extScore)
           const priceAt = sig.price_at_signal
 

@@ -73,7 +73,7 @@ function classificationColor(cls: string | null): string {
 
 function SignalRow({ signal, expanded, onToggle }: { signal: SignalHistory; expanded: boolean; onToggle: () => void }) {
   const outcome = signal.outcome ?? signal.outcome_1h
-  const extScore = signal.extended_score ?? signal.confidence
+  const extScore = signal.confidence ?? signal.extended_score
   const classification = signal.classification || (extScore >= 85 ? 'PREMIUM' : extScore >= 70 ? 'STRONG' : extScore >= 55 ? 'VALID' : 'WEAK')
 
   return (

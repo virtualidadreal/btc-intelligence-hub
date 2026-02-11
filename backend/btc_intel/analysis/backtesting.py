@@ -460,9 +460,8 @@ def store_signal_snapshot():
                 except Exception as e:
                     console.print(f"  [yellow]TP/SL error for {tf}: {e}[/yellow]")
 
-        # Classify signal quality using extended_score if available
-        ext_score = record.get("extended_score")
-        display_score = ext_score if ext_score is not None else confidence
+        # Classify signal quality using base confidence
+        display_score = confidence
         if display_score >= 85:
             classification = "PREMIUM"
         elif display_score >= 70:
