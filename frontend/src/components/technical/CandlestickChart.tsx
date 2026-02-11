@@ -204,9 +204,10 @@ export default function CandlestickChart({
     if (overlays.sr && levels.length) {
       const low = Math.min(...candleData.map((d) => d.low))
       const high = Math.max(...candleData.map((d) => d.high))
+      const range = high - low
       const srLevels = levels
-        .filter((l) => l.strength >= 5 && l.price >= low && l.price <= high)
-        .slice(0, 20)
+        .filter((l) => l.strength >= 1 && l.price >= low - range * 0.3 && l.price <= high + range * 0.3)
+        .slice(0, 25)
 
       for (const l of srLevels) {
         candleSeries.createPriceLine({
