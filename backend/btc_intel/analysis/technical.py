@@ -146,11 +146,15 @@ def analyze_technical() -> int:
     # Bollinger Bands(20,2)
     bb = ta.bbands(df["close"], length=20, std=2)
     if bb is not None and not bb.empty:
+        # Column names vary by pandas_ta version: BBU_20_2.0 or BBU_20_2.0_2.0
+        bb_upper_col = next((c for c in bb.columns if c.startswith("BBU")), None)
+        bb_mid_col = next((c for c in bb.columns if c.startswith("BBM")), None)
+        bb_lower_col = next((c for c in bb.columns if c.startswith("BBL")), None)
         for i in range(len(bb)):
             row_bb = bb.iloc[i]
-            upper = row_bb.get("BBU_20_2.0")
-            mid = row_bb.get("BBM_20_2.0")
-            lower = row_bb.get("BBL_20_2.0")
+            upper = row_bb.get(bb_upper_col) if bb_upper_col else None
+            mid = row_bb.get(bb_mid_col) if bb_mid_col else None
+            lower = row_bb.get(bb_lower_col) if bb_lower_col else None
             if pd.notna(upper) and pd.notna(lower) and pd.notna(mid):
                 price = df.iloc[i]["close"]
                 sig = classifier.classify_bollinger(float(price), float(upper), float(lower), float(mid))

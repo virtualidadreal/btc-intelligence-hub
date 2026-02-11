@@ -95,9 +95,15 @@ def _compute_indicators_from_candles(df: pd.DataFrame) -> dict:
     if bb is not None and not bb.empty:
         last_bb = bb.dropna().iloc[-1] if not bb.dropna().empty else None
         if last_bb is not None:
-            upper = float(last_bb.get("BBU_20_2.0", 0))
-            lower = float(last_bb.get("BBL_20_2.0", 0))
-            mid = float(last_bb.get("BBM_20_2.0", 0))
+            # pandas_ta column names vary by version: BBU_20_2.0 or BBU_20_2.0_2.0
+            upper = lower = mid = 0.0
+            for col in last_bb.index:
+                if col.startswith("BBU"):
+                    upper = float(last_bb[col])
+                elif col.startswith("BBL"):
+                    lower = float(last_bb[col])
+                elif col.startswith("BBM"):
+                    mid = float(last_bb[col])
             if upper and lower:
                 indicator_values["BB_UPPER"] = upper
                 indicator_values["BB_LOWER"] = lower
@@ -207,9 +213,9 @@ def store_signal_snapshot():
     onchain = (
         db.table("onchain_metrics")
         .select("metric,value,signal")
-        .in_("metric", ["HASH_RATE_MOM", "HASH_RATE_30D_CHANGE", "NVT_RATIO"])
+        .in_("metric", ["HASH_RATE_MOM", "HASH_RATE_MOM_30D", "HASH_RATE_30D_CHANGE", "NVT_RATIO"])
         .order("date", desc=True)
-        .limit(6)
+        .limit(8)
         .execute()
     )
     for oc in onchain.data or []:
