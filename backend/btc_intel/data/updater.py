@@ -4,7 +4,7 @@ import asyncio
 
 from rich.console import Console
 
-from btc_intel.data.btc_loader import load_btc_prices
+from btc_intel.data.btc_loader import load_btc_prices, load_btc_hourly
 from btc_intel.data.macro_loader import load_macro_data
 from btc_intel.data.onchain_loader import load_onchain_data
 from btc_intel.data.sentiment_loader import load_sentiment_data
@@ -18,9 +18,14 @@ async def update_all() -> dict:
     console.print("[bold cyan]═══ Updating ALL data ═══[/bold cyan]\n")
     results = {}
 
-    # BTC prices
-    console.print("[bold]BTC Prices[/bold]")
+    # BTC prices (daily)
+    console.print("[bold]BTC Prices (Daily)[/bold]")
     results["btc"] = await load_btc_prices()
+    console.print()
+
+    # BTC prices (hourly)
+    console.print("[bold]BTC Prices (Hourly)[/bold]")
+    results["btc_hourly"] = await load_btc_hourly()
     console.print()
 
     # Macro data
@@ -52,6 +57,7 @@ async def update_only(category: str) -> int:
     """Update a single category."""
     loaders = {
         "btc": load_btc_prices,
+        "btc_hourly": load_btc_hourly,
         "macro": load_macro_data,
         "onchain": load_onchain_data,
         "sentiment": load_sentiment_data,

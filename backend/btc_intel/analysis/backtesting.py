@@ -2,14 +2,18 @@
 
 from datetime import date, datetime, timedelta, timezone
 
+import pandas as pd
+import pandas_ta as ta
 from rich.console import Console
 
 from btc_intel.db import get_supabase
 from btc_intel.trading import CandlePattern, PriceLevel, SwingPoint
 from btc_intel.trading.extended_scorer import ExtendedSignalScorer
 from btc_intel.trading.enhanced_tpsl import EnhancedTPSL
+from btc_intel.analysis.signal_classifier import SignalClassifier
 
 console = Console()
+_classifier = SignalClassifier()
 
 # Replicate frontend WEIGHTS for scoring
 WEIGHTS = {
@@ -37,8 +41,141 @@ ATR_SCALE = {"1H": 0.15, "4H": 0.35, "1D": 1.0, "1W": 2.0}
 HTF_MAP = {"1H": "4H", "4H": "1D", "1D": "1W", "1W": None}
 
 
+def _compute_indicators_from_candles(df: pd.DataFrame) -> dict:
+    """Compute RSI, MACD, EMA, BB, ATR from a candle DataFrame.
+
+    Returns a dict with signal_map (str signals) and indicator_values (floats).
+    The DataFrame must have columns: open, high, low, close, volume.
+    """
+    signal_map: dict[str, str] = {}
+    indicator_values: dict[str, float] = {}
+
+    close = df["close"].astype(float)
+    high = df["high"].astype(float)
+    low = df["low"].astype(float)
+    current_price = float(close.iloc[-1])
+
+    # RSI(14)
+    rsi = ta.rsi(close, length=14)
+    if rsi is not None and not rsi.empty:
+        last_rsi = float(rsi.dropna().iloc[-1])
+        indicator_values["RSI_14"] = last_rsi
+        signal_map["RSI_14"] = _classifier.classify_rsi(last_rsi)["signal"]
+
+    # MACD(12,26,9)
+    macd_df = ta.macd(close, fast=12, slow=26, signal=9)
+    if macd_df is not None and not macd_df.empty:
+        last_row = macd_df.dropna().iloc[-1] if not macd_df.dropna().empty else None
+        if last_row is not None:
+            macd_val = float(last_row.get("MACD_12_26_9", 0))
+            signal_val = float(last_row.get("MACDs_12_26_9", 0))
+            hist_val = float(last_row.get("MACDh_12_26_9", 0))
+            indicator_values["MACD"] = macd_val
+            signal_map["MACD"] = _classifier.classify_macd(macd_val, signal_val, hist_val)["signal"]
+
+    # EMA(21)
+    ema21 = ta.ema(close, length=21)
+    if ema21 is not None and not ema21.empty:
+        last_ema = float(ema21.dropna().iloc[-1])
+        indicator_values["EMA_21"] = last_ema
+        pct = ((current_price - last_ema) / last_ema) * 100
+        if pct > 5:
+            signal_map["EMA_21"] = "extreme_bullish"
+        elif pct > 1:
+            signal_map["EMA_21"] = "bullish"
+        elif pct > -1:
+            signal_map["EMA_21"] = "neutral"
+        elif pct > -5:
+            signal_map["EMA_21"] = "bearish"
+        else:
+            signal_map["EMA_21"] = "extreme_bearish"
+
+    # Bollinger Bands(20,2)
+    bb = ta.bbands(close, length=20, std=2)
+    if bb is not None and not bb.empty:
+        last_bb = bb.dropna().iloc[-1] if not bb.dropna().empty else None
+        if last_bb is not None:
+            upper = float(last_bb.get("BBU_20_2.0", 0))
+            lower = float(last_bb.get("BBL_20_2.0", 0))
+            mid = float(last_bb.get("BBM_20_2.0", 0))
+            if upper and lower:
+                indicator_values["BB_UPPER"] = upper
+                indicator_values["BB_LOWER"] = lower
+                signal_map["BB"] = _classifier.classify_bollinger(current_price, upper, lower, mid)["signal"]
+
+    # SMA Cross (50/200) — only useful if enough data
+    if len(close) >= 200:
+        sma50 = ta.sma(close, length=50)
+        sma200 = ta.sma(close, length=200)
+        if sma50 is not None and sma200 is not None:
+            s50 = float(sma50.dropna().iloc[-1])
+            s200 = float(sma200.dropna().iloc[-1])
+            signal_map["SMA_CROSS"] = _classifier.classify_sma_cross(s50, s200)["signal"]
+
+    # ATR(14)
+    atr = ta.atr(high, low, close, length=14)
+    if atr is not None and not atr.empty:
+        last_atr = float(atr.dropna().iloc[-1])
+        indicator_values["ATR_14"] = last_atr
+
+    return {"signal_map": signal_map, "indicator_values": indicator_values, "price": current_price}
+
+
+def _load_hourly_candles(db) -> pd.DataFrame | None:
+    """Load hourly candles from btc_prices_1h. Returns DataFrame or None."""
+    try:
+        all_rows: list[dict] = []
+        page_size = 1000
+        offset = 0
+        while True:
+            result = (
+                db.table("btc_prices_1h")
+                .select("timestamp,open,high,low,close,volume")
+                .order("timestamp")
+                .range(offset, offset + page_size - 1)
+                .execute()
+            )
+            if not result.data:
+                break
+            all_rows.extend(result.data)
+            if len(result.data) < page_size:
+                break
+            offset += page_size
+
+        if not all_rows:
+            return None
+
+        df = pd.DataFrame(all_rows)
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+        for col in ["open", "high", "low", "close", "volume"]:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        df = df.dropna(subset=["open", "high", "low", "close"])
+        df = df.sort_values("timestamp").reset_index(drop=True)
+        return df
+    except Exception as e:
+        console.print(f"  [yellow]Error loading hourly candles: {e}[/yellow]")
+        return None
+
+
+def _resample_to_4h(df_1h: pd.DataFrame) -> pd.DataFrame:
+    """Resample 1H candles to 4H candles."""
+    df = df_1h.set_index("timestamp")
+    resampled = df.resample("4h").agg({
+        "open": "first",
+        "high": "max",
+        "low": "min",
+        "close": "last",
+        "volume": "sum",
+    }).dropna(subset=["open", "close"])
+    return resampled.reset_index()
+
+
 def store_signal_snapshot():
-    """Take a snapshot of current signals and store as signal_history."""
+    """Take a snapshot of current signals and store as signal_history.
+
+    For 1H/4H: computes indicators from real hourly candles (btc_prices_1h).
+    For 1D/1W: uses daily indicators from technical_indicators table.
+    """
     db = get_supabase()
 
     console.print("[bold]Signal Backtesting — Snapshot[/bold]")
@@ -51,7 +188,85 @@ def store_signal_snapshot():
 
     current_price = float(price_res.data[0]["close"])
 
-    # Get latest indicators (include ATR_14 for TP/SL)
+    # ── Load shared non-technical signals (used by ALL timeframes) ──
+
+    # Fear & Greed
+    fg_value = None
+    fg_signal = None
+    fg = db.table("sentiment_data").select("value").eq("metric", "FEAR_GREED").order("date", desc=True).limit(1).execute()
+    if fg.data:
+        fg_value = int(fg.data[0]["value"])
+        if fg_value <= 15: fg_signal = "extreme_bearish"
+        elif fg_value <= 30: fg_signal = "bearish"
+        elif fg_value <= 55: fg_signal = "neutral"
+        elif fg_value <= 80: fg_signal = "bullish"
+        else: fg_signal = "extreme_bullish"
+
+    # On-chain: HASH_RATE_MOM, NVT_RATIO
+    onchain_signals: dict[str, str] = {}
+    onchain = (
+        db.table("onchain_metrics")
+        .select("metric,value,signal")
+        .in_("metric", ["HASH_RATE_MOM", "HASH_RATE_30D_CHANGE", "NVT_RATIO"])
+        .order("date", desc=True)
+        .limit(6)
+        .execute()
+    )
+    for oc in onchain.data or []:
+        # Unify HASH_RATE variants to HASH_RATE_MOM
+        key = "HASH_RATE_MOM" if oc["metric"].startswith("HASH_RATE") else oc["metric"]
+        if key not in onchain_signals:
+            if oc.get("signal") and oc["signal"] not in ("", "???"):
+                onchain_signals[key] = oc["signal"]
+            elif oc.get("value") is not None and key == "HASH_RATE_MOM":
+                # Fallback: classify from raw value if signal is missing/broken
+                try:
+                    val = float(oc["value"])
+                    onchain_signals[key] = _classifier.classify_hash_rate_change(val)["signal"]
+                except (ValueError, TypeError):
+                    pass
+
+    # Cycle Score
+    cycle_signal = None
+    cs = db.table("cycle_score_history").select("score").order("date", desc=True).limit(1).execute()
+    if cs.data:
+        score = float(cs.data[0]["score"])
+        if score <= 20: cycle_signal = "extreme_bullish"
+        elif score <= 40: cycle_signal = "bullish"
+        elif score <= 60: cycle_signal = "neutral"
+        elif score <= 80: cycle_signal = "bearish"
+        else: cycle_signal = "extreme_bearish"
+
+    # ── Build per-timeframe signal maps ──
+    # For 1H/4H: compute technical indicators from hourly candles
+    # For 1D/1W: use daily indicators from technical_indicators table
+
+    tf_signal_maps: dict[str, dict] = {}
+    tf_indicator_values: dict[str, dict] = {}
+
+    # --- 1H and 4H from hourly candles ---
+    df_1h = _load_hourly_candles(db)
+    if df_1h is not None and len(df_1h) >= 30:
+        console.print(f"  [cyan]Loaded {len(df_1h)} hourly candles for 1H/4H indicators[/cyan]")
+
+        # 1H indicators
+        result_1h = _compute_indicators_from_candles(df_1h)
+        tf_signal_maps["1H"] = result_1h["signal_map"]
+        tf_indicator_values["1H"] = result_1h["indicator_values"]
+        current_price = result_1h["price"]  # Use latest hourly price
+
+        # 4H indicators (resample)
+        df_4h = _resample_to_4h(df_1h)
+        if len(df_4h) >= 30:
+            result_4h = _compute_indicators_from_candles(df_4h)
+            tf_signal_maps["4H"] = result_4h["signal_map"]
+            tf_indicator_values["4H"] = result_4h["indicator_values"]
+        else:
+            console.print("  [dim]Not enough 4H candles, using daily indicators[/dim]")
+    else:
+        console.print("  [dim]No hourly data, 1H/4H will use daily indicators[/dim]")
+
+    # --- 1D and 1W from daily indicators (existing behavior) ---
     indicators = (
         db.table("technical_indicators")
         .select("indicator,value,signal")
@@ -60,70 +275,64 @@ def store_signal_snapshot():
         .limit(30)
     ).execute()
 
-    signal_map = {}
-    indicator_values = {}  # Numeric values for v2 scoring
+    daily_signal_map: dict[str, str] = {}
+    daily_indicator_values: dict[str, float] = {}
     for ind in indicators.data or []:
         name = ind["indicator"]
-        if name not in signal_map and ind.get("signal"):
-            signal_map[name] = ind["signal"]
-        if name not in indicator_values and ind.get("value") is not None:
+        if name not in daily_signal_map and ind.get("signal") and ind["signal"] not in ("", "???"):
+            daily_signal_map[name] = ind["signal"]
+        if name not in daily_indicator_values and ind.get("value") is not None:
             try:
-                indicator_values[name] = float(ind["value"])
+                daily_indicator_values[name] = float(ind["value"])
             except (ValueError, TypeError):
                 pass
 
-    # BB composite signal
-    if "BB_UPPER" in signal_map:
-        signal_map["BB"] = signal_map.pop("BB_UPPER")
-    elif "BB_LOWER" in signal_map:
-        signal_map["BB"] = signal_map.pop("BB_LOWER")
+    # BB composite signal from daily
+    if "BB_UPPER" in daily_signal_map:
+        daily_signal_map["BB"] = daily_signal_map.pop("BB_UPPER")
+        daily_signal_map.pop("BB_LOWER", None)
+    elif "BB_LOWER" in daily_signal_map:
+        daily_signal_map["BB"] = daily_signal_map.pop("BB_LOWER")
 
-    # Fear & Greed (keep numeric value for onchain scoring)
-    fg_value = None
-    fg = db.table("sentiment_data").select("value").eq("metric", "FEAR_GREED").order("date", desc=True).limit(1).execute()
-    if fg.data:
-        fg_value = int(fg.data[0]["value"])
-        if fg_value <= 15: signal_map["FEAR_GREED"] = "extreme_bearish"
-        elif fg_value <= 30: signal_map["FEAR_GREED"] = "bearish"
-        elif fg_value <= 55: signal_map["FEAR_GREED"] = "neutral"
-        elif fg_value <= 80: signal_map["FEAR_GREED"] = "bullish"
-        else: signal_map["FEAR_GREED"] = "extreme_bullish"
-
-    # On-chain
-    onchain = db.table("onchain_metrics").select("metric,signal").in_("metric", ["HASH_RATE_MOM", "NVT_RATIO"]).order("date", desc=True).limit(4).execute()
-    for oc in onchain.data or []:
-        key = "HASH_RATE_MOM" if oc["metric"].startswith("HASH_RATE") else oc["metric"]
-        if key not in signal_map and oc.get("signal"):
-            signal_map[key] = oc["signal"]
-
-    # Cycle Score
-    cs = db.table("cycle_score_history").select("score").order("date", desc=True).limit(1).execute()
-    if cs.data:
-        score = float(cs.data[0]["score"])
-        if score <= 20: signal_map["CYCLE_SCORE"] = "extreme_bullish"
-        elif score <= 40: signal_map["CYCLE_SCORE"] = "bullish"
-        elif score <= 60: signal_map["CYCLE_SCORE"] = "neutral"
-        elif score <= 80: signal_map["CYCLE_SCORE"] = "bearish"
-        else: signal_map["CYCLE_SCORE"] = "extreme_bearish"
-
-    # EMA signal
-    ema_val = indicator_values.get("EMA_21")
+    # EMA signal from daily
+    ema_val = daily_indicator_values.get("EMA_21")
     if ema_val and current_price:
         pct = ((current_price - ema_val) / ema_val) * 100
-        if pct > 5: signal_map["EMA_21"] = "extreme_bullish"
-        elif pct > 1: signal_map["EMA_21"] = "bullish"
-        elif pct > -1: signal_map["EMA_21"] = "neutral"
-        elif pct > -5: signal_map["EMA_21"] = "bearish"
-        else: signal_map["EMA_21"] = "extreme_bearish"
+        if pct > 5: daily_signal_map["EMA_21"] = "extreme_bullish"
+        elif pct > 1: daily_signal_map["EMA_21"] = "bullish"
+        elif pct > -1: daily_signal_map["EMA_21"] = "neutral"
+        elif pct > -5: daily_signal_map["EMA_21"] = "bearish"
+        else: daily_signal_map["EMA_21"] = "extreme_bearish"
 
-    # Load v2 data (levels, fib, ATR, BB, on-chain values)
-    v2_data = _load_v2_data(db, current_price, indicator_values, fg_value)
+    # Assign daily signals to 1D/1W (and as fallback for 1H/4H if missing)
+    for tf in ["1D", "1W"]:
+        tf_signal_maps[tf] = dict(daily_signal_map)
+        tf_indicator_values[tf] = dict(daily_indicator_values)
+    for tf in ["1H", "4H"]:
+        if tf not in tf_signal_maps:
+            tf_signal_maps[tf] = dict(daily_signal_map)
+            tf_indicator_values[tf] = dict(daily_indicator_values)
+
+    # Inject shared signals into all timeframe maps
+    for tf in WEIGHTS:
+        sm = tf_signal_maps[tf]
+        if fg_signal:
+            sm["FEAR_GREED"] = fg_signal
+        for key, sig in onchain_signals.items():
+            if key not in sm:
+                sm[key] = sig
+        if cycle_signal:
+            sm["CYCLE_SCORE"] = cycle_signal
+
+    # Load v2 data using daily indicator values (levels, fib, ATR, etc.)
+    v2_data = _load_v2_data(db, current_price, daily_indicator_values, fg_value)
 
     # ── PASS 1: Compute base confidence + direction for all TFs ──
     base_signals = {}
     now = datetime.now(timezone.utc).isoformat()
 
     for tf, weights in WEIGHTS.items():
+        signal_map = tf_signal_maps[tf]
         total_score = 0.0
         for key, weight in weights.items():
             if weight == 0:
@@ -204,9 +413,21 @@ def store_signal_snapshot():
                 console.print(f"  [yellow]Extended scorer error for {tf}: {e}[/yellow]")
 
             # ── TP/SL Calculation ──
-            atr_daily = v2_data.get("atr", 0)
-            atr_tf = atr_daily * ATR_SCALE.get(tf, 1.0)
-            bb = v2_data.get("bb", {})
+            # Use per-TF ATR from real candles when available, else scale daily
+            tf_atr = tf_indicator_values.get(tf, {}).get("ATR_14")
+            if tf_atr and tf in ("1H", "4H"):
+                atr_tf = tf_atr
+            else:
+                atr_daily = v2_data.get("atr", 0)
+                atr_tf = atr_daily * ATR_SCALE.get(tf, 1.0)
+
+            # Use per-TF BB values when available
+            tf_bb_upper = tf_indicator_values.get(tf, {}).get("BB_UPPER")
+            tf_bb_lower = tf_indicator_values.get(tf, {}).get("BB_LOWER")
+            if tf_bb_upper and tf_bb_lower and tf in ("1H", "4H"):
+                bb = {"upper": tf_bb_upper, "lower": tf_bb_lower, "mid": (tf_bb_upper + tf_bb_lower) / 2}
+            else:
+                bb = v2_data.get("bb", {})
             swing_points = v2_data.get("swing_points", [])
 
             if atr_tf > 0:
@@ -334,16 +555,39 @@ def evaluate_past_signals():
             continue
 
         # Get prices between signal and evaluation window
-        prices_after = (
-            db.table("btc_prices")
-            .select("date,close,high,low")
-            .gte("date", signal_date[:10])
-            .lte("date", (eval_after + timedelta(days=1)).strftime("%Y-%m-%d"))
-            .order("date", desc=False)
-            .execute()
-        )
+        # For 1H/4H: prefer hourly candles for finer granularity
+        prices_after_data = None
+        if tf in ("1H", "4H"):
+            try:
+                hourly_after = (
+                    db.table("btc_prices_1h")
+                    .select("timestamp,close,high,low")
+                    .gte("timestamp", signal_dt.isoformat())
+                    .lte("timestamp", (eval_after + timedelta(hours=1)).isoformat())
+                    .order("timestamp", desc=False)
+                    .execute()
+                )
+                if hourly_after.data:
+                    # Normalize field names: use "date" key for compatibility with _evaluate_tpsl
+                    prices_after_data = [
+                        {"date": r["timestamp"], "close": r["close"], "high": r["high"], "low": r["low"]}
+                        for r in hourly_after.data
+                    ]
+            except Exception:
+                pass  # fallback to daily
 
-        if not prices_after.data:
+        if not prices_after_data:
+            prices_after = (
+                db.table("btc_prices")
+                .select("date,close,high,low")
+                .gte("date", signal_date[:10])
+                .lte("date", (eval_after + timedelta(days=1)).strftime("%Y-%m-%d"))
+                .order("date", desc=False)
+                .execute()
+            )
+            prices_after_data = prices_after.data if prices_after.data else None
+
+        if not prices_after_data:
             continue
 
         sl = signal.get("sl")
@@ -358,11 +602,11 @@ def evaluate_past_signals():
 
             outcome, hit_at = _evaluate_tpsl(
                 direction, price_at, sl, tp1, tp2,
-                prices_after.data, signal_dt
+                prices_after_data, signal_dt
             )
         else:
             # Fallback: simple price direction
-            price_later = float(prices_after.data[-1]["close"])
+            price_later = float(prices_after_data[-1]["close"])
             pct_change = ((price_later - price_at) / price_at) * 100
 
             if direction == "LONG":

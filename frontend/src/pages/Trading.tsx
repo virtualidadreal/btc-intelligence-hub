@@ -469,6 +469,15 @@ function TimeframeDetail({ rec, price, t, v2Data, htfDirection }: { rec: Trading
   const totalSignals = rec.bullishCount + rec.bearishCount + rec.neutralCount
   const v2Signal = v2Data?.latestV2Signals?.find(s => s.timeframe === rec.timeframe)
 
+  // Use backend values from signal_history when available (single source of truth)
+  const displayScore = v2Signal?.extended_score ?? rec.extendedScore
+  const displayClassification = v2Signal?.classification || rec.classification
+  const displayConfidence = v2Signal?.confidence ?? rec.confidence
+  const displayBonusLevels = v2Signal?.level_score ?? rec.bonusLevels
+  const displayBonusCandles = v2Signal?.candle_score ?? rec.bonusCandles
+  const displayBonusOnchain = v2Signal?.onchain_bonus ?? rec.bonusOnchain
+  const displayPenalties = v2Signal?.penalties ?? rec.penalties
+
   return (
     <div className="rounded-xl bg-bg-secondary/60 border border-border backdrop-blur-sm overflow-hidden">
       {/* Header */}
@@ -487,10 +496,10 @@ function TimeframeDetail({ rec, price, t, v2Data, htfDirection }: { rec: Trading
           )}
         </div>
         <div className="text-right">
-          <span className={cn('font-mono text-lg font-bold', directionColor(rec.direction))}>{rec.extendedScore}%</span>
+          <span className={cn('font-mono text-lg font-bold', directionColor(rec.direction))}>{displayScore}%</span>
           <div className="flex items-center gap-1.5 justify-end mt-0.5">
-            <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border', classificationBg(rec.classification))}>
-              {rec.classification}
+            <span className={cn('text-[9px] font-bold px-1.5 py-0.5 rounded border', classificationBg(displayClassification))}>
+              {displayClassification}
             </span>
           </div>
         </div>
@@ -516,13 +525,13 @@ function TimeframeDetail({ rec, price, t, v2Data, htfDirection }: { rec: Trading
 
           {/* Score breakdown bar */}
           <div className="flex items-center gap-1.5 text-[10px] font-mono flex-wrap mb-2">
-            <span className="text-text-muted">{t('trading.baseScore')}: {rec.confidence}</span>
-            {rec.bonusLevels > 0 && <span className="text-green-400">+{rec.bonusLevels} {t('trading.bonusLevels')}</span>}
-            {rec.bonusCandles > 0 && <span className="text-blue-400">+{rec.bonusCandles} {t('trading.bonusCandles')}</span>}
-            {rec.bonusOnchain > 0 && <span className="text-purple-400">+{rec.bonusOnchain} {t('trading.bonusOnchain')}</span>}
-            {rec.penalties < 0 && <span className="text-red-400">{rec.penalties} {t('trading.penaltiesLabel')}</span>}
+            <span className="text-text-muted">{t('trading.baseScore')}: {displayConfidence}</span>
+            {displayBonusLevels > 0 && <span className="text-green-400">+{displayBonusLevels} {t('trading.bonusLevels')}</span>}
+            {displayBonusCandles > 0 && <span className="text-blue-400">+{displayBonusCandles} {t('trading.bonusCandles')}</span>}
+            {displayBonusOnchain > 0 && <span className="text-purple-400">+{displayBonusOnchain} {t('trading.bonusOnchain')}</span>}
+            {displayPenalties < 0 && <span className="text-red-400">{displayPenalties} {t('trading.penaltiesLabel')}</span>}
             <span className="text-text-muted">=</span>
-            <span className={cn('font-bold', classificationColor(rec.classification))}>{rec.extendedScore}%</span>
+            <span className={cn('font-bold', classificationColor(displayClassification))}>{displayScore}%</span>
           </div>
 
           {/* Structural Analysis */}
