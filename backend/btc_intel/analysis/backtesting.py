@@ -476,7 +476,7 @@ def store_signal_snapshot():
 
         # Use base confidence for storage threshold (backwards compatible)
         # Extended score is informational — penalties shouldn't block storage
-        if confidence < 55:
+        if confidence < 40:
             continue
 
         record["classification"] = classification
