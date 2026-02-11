@@ -10,6 +10,7 @@ import RsiChart from '../components/technical/RsiChart'
 import MacdChart from '../components/technical/MacdChart'
 import LevelMap from '../components/technical/LevelMap'
 import ConfluenceCards from '../components/technical/ConfluenceCards'
+import SRLevelsSection from '../components/technical/SRLevelsSection'
 import ReturnHeatmap from '../components/technical/ReturnHeatmap'
 import TechnicalInterpretation from '../components/technical/TechnicalInterpretation'
 import OverlayControls, { useOverlays } from '../components/technical/OverlayControls'
@@ -319,17 +320,13 @@ export default function Technical() {
         )}
       </ChartContainer>
 
-      {/* ── Level Map + Confluence — side by side ─────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-          <h3 className="font-display font-semibold mb-3">{t('technical.levelMap')}</h3>
-          <LevelMap levels={levels || []} currentPrice={currentPrice} />
-        </div>
-        <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
-          <h3 className="font-display font-semibold mb-3">{t('technical.confluenceZones')}</h3>
-          <ConfluenceCards zones={confluenceZones || []} currentPrice={currentPrice} />
-        </div>
-      </div>
+      {/* ── S/R Levels + Fibonacci + Confluence ─────────────── */}
+      <SRLevelsSection
+        levels={levels || []}
+        fibLevels={fibLevels || []}
+        confluenceZones={confluenceZones || []}
+        currentPrice={currentPrice}
+      />
 
       {/* ── Return Heatmap ────────────────────────────────────── */}
       <div className="rounded-xl bg-bg-secondary/60 border border-border p-4 backdrop-blur-sm">
