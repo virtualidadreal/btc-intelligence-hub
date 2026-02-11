@@ -1,10 +1,7 @@
 name: Daily AI Report
 
 on:
-  schedule:
-    # Every day at 8:00 UTC
-    - cron: '0 8 * * *'
-  workflow_dispatch: # Manual trigger
+  workflow_dispatch: # Triggered by n8n daily at 8:00 UTC
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
