@@ -12,7 +12,7 @@ export default function LevelMap({ levels, currentPrice }: Props) {
   const { t } = useI18n()
 
   const { resistances, supports } = useMemo(() => {
-    const active = levels.filter((l) => l.strength >= 5)
+    const active = levels.filter((l) => l.strength >= 1)
     const res = active
       .filter((l) => l.price > currentPrice)
       .sort((a, b) => a.price - b.price)
