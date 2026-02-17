@@ -485,7 +485,8 @@ def store_signal_snapshot():
         sl = record.get("sl")
         tp1_str = f"${tp1:,.0f}" if tp1 else "N/A"
         sl_str = f"${sl:,.0f}" if sl else "N/A"
-        ext_str = f"ext={display_score}" if ext_score is not None else "ext=N/A"
+        ext_score = record.get("extended_score")
+        ext_str = f"ext={ext_score}" if ext_score is not None else "ext=N/A"
         console.print(f"  {tf} {direction} conf={confidence} {ext_str} tp1={tp1_str} sl={sl_str} [{classification}]")
 
         try:
